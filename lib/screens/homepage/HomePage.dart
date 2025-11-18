@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_overlay_window/flutter_overlay_window.dart';
 import 'package:hover_note/constants/AppTextStyle.dart';
 import 'package:hover_note/models/Notes.dart';
 import 'package:hover_note/models/note_database.dart';
@@ -15,6 +16,27 @@ class Homepage extends StatefulWidget {
   State<Homepage> createState() => _HomepageState();
 }
 
+Future<void> showOverlay(Notes note) async {
+  bool permitted = await FlutterOverlayWindow.isPermissionGranted();
+
+  if (!permitted) {
+    permitted = (await FlutterOverlayWindow.requestPermission())!;
+  }
+
+  if (permitted) {
+    await FlutterOverlayWindow.showOverlay(
+      enableDrag: true,
+      height: 300,
+      width: 300,
+      
+    );
+
+    FlutterOverlayWindow.shareData({
+      "text": note.text,
+      "color": note.color,
+    });
+  }
+}
 class _HomepageState extends State<Homepage> {
   @override
   void initState() {
@@ -26,6 +48,8 @@ class _HomepageState extends State<Homepage> {
   void readNotes() {
     context.read<NoteDatabase>().fetchNotes();
   }
+
+  
 
   @override
   Widget build(BuildContext context) {
@@ -140,6 +164,7 @@ class _HomepageState extends State<Homepage> {
                           openCreateEditPage(note: note);
                         },
                         child: customContainer(
+                          notes: note,
                           width: 80.w,
                           text: note.text,
                           color: Color(note.color),
@@ -154,10 +179,11 @@ class _HomepageState extends State<Homepage> {
 }
 
 class customContainer extends StatelessWidget {
+  final Notes? notes;
   final double? width;
   final Color? color;
   final String? text;
-  const customContainer({super.key, this.color, this.text, this.width});
+  const customContainer({super.key, this.color, this.text, this.width,this.notes});
 
   @override
   Widget build(BuildContext context) {
@@ -180,12 +206,15 @@ class customContainer extends StatelessWidget {
               style: AppTextStyle.aristabold17.copyWith(color: Colors.white),
             ),
           ),
-          Container(
-            padding: EdgeInsets.only(top: 0.5.h, left: 2.5.w),
-            child: FaIcon(
-              FontAwesomeIcons.play,
-              color: Colors.white,
-              size: 2.h,
+          GestureDetector(
+            onTap: () => showOverlay(notes!) ,
+            child: Container(
+              padding: EdgeInsets.only(top: 0.5.h, left: 2.5.w),
+              child: FaIcon(
+                FontAwesomeIcons.play,
+                color: Colors.white,
+                size: 2.h,
+              ),
             ),
           ),
         ],

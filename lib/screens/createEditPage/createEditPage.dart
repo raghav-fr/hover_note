@@ -176,7 +176,7 @@ class _CreateeditpageState extends State<Createeditpage> {
                         if (reminderDateTime != null) {
                           context.read<NoteDatabase>().scheduleNoteReminder(
                             textController.text,
-                            Colors.pink,
+                            currentcolor!,
                             reminderDateTime!,
                           );
                           context.read<NoteDatabase>().deleteNote(
