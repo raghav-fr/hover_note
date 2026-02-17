@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_overlay_window/flutter_overlay_window.dart';
 import 'package:hover_note/constants/AppTextStyle.dart';
 import 'package:hover_note/models/Notes.dart';
 import 'package:hover_note/models/note_database.dart';
 import 'package:hover_note/screens/createEditPage/createEditPage.dart';
+// import 'package:intl/date_symbols.dart';
 import 'package:page_transition/page_transition.dart';
 import 'package:provider/provider.dart';
 import 'package:sizer/sizer.dart';
@@ -23,33 +25,61 @@ Future<void> showOverlay(Notes note) async {
     permitted = (await FlutterOverlayWindow.requestPermission())!;
   }
 
-  if (permitted) {
-    await FlutterOverlayWindow.showOverlay(
-      enableDrag: true,
-      height: 300,
-      width: 300,
-      
-    );
+  if (!permitted) return;
 
-    FlutterOverlayWindow.shareData({
-      "text": note.text,
-      "color": note.color,
-    });
-  }
+  await FlutterOverlayWindow.showOverlay(
+    width: 800,
+    height: 600,
+    enableDrag: true,
+    alignment: OverlayAlignment.center,
+    flag: OverlayFlag.defaultFlag,
+  );
+
+  await Future.delayed(const Duration(milliseconds: 400));
+
+  FlutterOverlayWindow.shareData({
+    "text": note.text,
+    "color": note.color,
+    "id": note.id,
+  });
 }
+
 class _HomepageState extends State<Homepage> {
+  static const MethodChannel _channel = MethodChannel('overlay_launcher');
   @override
-  void initState() {
-    // TODO: implement initState
-    super.initState();
-    context.read<NoteDatabase>().fetchNotes();
+void initState() {
+  super.initState();
+  context.read<NoteDatabase>().fetchNotes();
+
+  WidgetsBinding.instance.addPostFrameCallback((_) {
+    _checkLaunchIntent();
+  });
+}
+
+  Future<void> _checkLaunchIntent() async {
+    try {
+      final Map? data = await _channel.invokeMethod('getInitialIntent');
+
+      if (data != null && data['open_edit'] == true) {
+        final id = data['note_id'];
+
+        final note = context.read<NoteDatabase>().currentNotes.firstWhere(
+          (n) => n.id == id,
+        );
+        print("Opening edit page for note id: $id with text: ${note.text}");
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => Createeditpage(editnote: note)),
+        );
+      }
+    } catch (e) {
+      debugPrint("Intent read error: $e");
+    }
   }
 
   void readNotes() {
     context.read<NoteDatabase>().fetchNotes();
   }
-
-  
 
   @override
   Widget build(BuildContext context) {
@@ -183,7 +213,13 @@ class customContainer extends StatelessWidget {
   final double? width;
   final Color? color;
   final String? text;
-  const customContainer({super.key, this.color, this.text, this.width,this.notes});
+  const customContainer({
+    super.key,
+    this.color,
+    this.text,
+    this.width,
+    this.notes,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -207,7 +243,7 @@ class customContainer extends StatelessWidget {
             ),
           ),
           GestureDetector(
-            onTap: () => showOverlay(notes!) ,
+            onTap: () => showOverlay(notes!),
             child: Container(
               padding: EdgeInsets.only(top: 0.5.h, left: 2.5.w),
               child: FaIcon(
