@@ -1,10 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_overlay_window/flutter_overlay_window.dart';
 
 enum OverlayMode { expanded, bubble }
-
-// const MethodChannel _channel = MethodChannel('overlay_launcher');
 
 class HoverOverlay extends StatefulWidget {
   const HoverOverlay({super.key});
@@ -14,51 +11,80 @@ class HoverOverlay extends StatefulWidget {
 }
 
 class _HoverOverlayState extends State<HoverOverlay> {
-  String text = "Loading...";
-  int color = 0xFF000000;
-  int? noteId;
-
-  OverlayMode mode = OverlayMode.expanded;
+  // Each note is stored by its ID
+  final Map<int, _OverlayNote> _notes = {};
 
   @override
   void initState() {
     super.initState();
 
     FlutterOverlayWindow.overlayListener.listen((data) {
+      if (data is! Map) return;
+
+      final String? command = data["command"];
+
       setState(() {
-        text = data["text"] ?? text;
-        color = data["color"] ?? color;
-        noteId = data["id"]; // ✅ primitive only
+        if (command == "add") {
+          final int id = data["id"];
+          if (_notes.containsKey(id)) {
+            _notes[id]!.text = data["text"] ?? _notes[id]!.text;
+            _notes[id]!.color = data["color"] ?? _notes[id]!.color;
+          } else {
+            _notes[id] = _OverlayNote(
+              id: id,
+              text: data["text"] ?? "",
+              color: data["color"] ?? 0xFF000000,
+              mode: OverlayMode.expanded,
+            );
+          }
+        } else if (command == "remove") {
+          final int id = data["id"];
+          _notes.remove(id);
+          if (_notes.isEmpty) {
+            FlutterOverlayWindow.closeOverlay();
+          }
+        }
       });
     });
   }
 
-  void minimizeToBubble() {
-    setState(() => mode = OverlayMode.bubble);
+  void _minimizeNote(int id) {
+    setState(() {
+      _notes[id]?.mode = OverlayMode.bubble;
+    });
   }
 
-  void expandOverlay() {
-    setState(() => mode = OverlayMode.expanded);
+  void _expandNote(int id) {
+    setState(() {
+      _notes[id]?.mode = OverlayMode.expanded;
+    });
   }
 
-  // Change your openEditPage function to this:
-void openEditPage() async {
-  print("Opening Edit Page for note ID: $noteId");
-  // 1. Send a message to the Main App via the shared bridge
-  await FlutterOverlayWindow.shareData({
-    'command': 'open_edit_page',
-    'id': noteId
-  });
+  Future<void> _closeNote(int id) async {
+    setState(() {
+      _notes.remove(id);
+    });
+    await FlutterOverlayWindow.shareData({
+      'command': 'overlay_closed',
+      'id': id,
+    });
+    if (_notes.isEmpty) {
+      await FlutterOverlayWindow.closeOverlay();
+    }
+  }
 
-  // 2. Close the overlay
-  await FlutterOverlayWindow.closeOverlay();
-}
+  void _openEditPage(int id) async {
+    await FlutterOverlayWindow.shareData({
+      'command': 'open_edit_page',
+      'id': id,
+    });
+    _closeNote(id);
+  }
+
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-
-      // Overlay-safe (prevents MouseTracker crash)
       builder: (context, child) {
         return Listener(
           onPointerHover: (_) {},
@@ -67,37 +93,64 @@ void openEditPage() async {
           child: child!,
         );
       },
-
       home: Scaffold(
         backgroundColor: Colors.transparent,
-        body: Center(
-          child: GestureDetector(
-            onTap: () {
-              if (mode == OverlayMode.bubble) {
-                expandOverlay();
-              }
-            },
-            onDoubleTap: () {
-              if (mode == OverlayMode.expanded) {
-                openEditPage();
-              }
-            },
-            child: AnimatedSwitcher(
-              duration: const Duration(milliseconds: 200),
-              child:
-                  mode == OverlayMode.bubble
-                      ? _BubbleView(color: color)
-                      : _ExpandedView(
-                        text: text,
-                        color: color,
-                        onMinimize: minimizeToBubble,
-                      ),
-            ),
+        body: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: _notes.values.map((note) {
+              return GestureDetector(
+                onTap: () {
+                  if (note.mode == OverlayMode.bubble) {
+                    _expandNote(note.id);
+                  }
+                },
+                onDoubleTap: () {
+                  if (note.mode == OverlayMode.expanded) {
+                    _openEditPage(note.id);
+                  }
+                },
+                child: Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 200),
+                    child: note.mode == OverlayMode.bubble
+                        ? _BubbleView(
+                            key: ValueKey("bubble_${note.id}"),
+                            color: note.color,
+                          )
+                        : _ExpandedView(
+                            key: ValueKey("expanded_${note.id}"),
+                            text: note.text,
+                            color: note.color,
+                            onMinimize: () => _minimizeNote(note.id),
+                            onClose: () => _closeNote(note.id),
+                          ),
+                  ),
+                ),
+              );
+            }).toList(),
           ),
         ),
       ),
     );
   }
+}
+
+/* ----------- Data class for each overlay note ----------- */
+
+class _OverlayNote {
+  final int id;
+  String text;
+  int color;
+  OverlayMode mode;
+
+  _OverlayNote({
+    required this.id,
+    required this.text,
+    required this.color,
+    required this.mode,
+  });
 }
 
 /* ---------------- Expanded View ---------------- */
@@ -106,21 +159,24 @@ class _ExpandedView extends StatelessWidget {
   final String text;
   final int color;
   final VoidCallback onMinimize;
+  final VoidCallback onClose;
 
   const _ExpandedView({
+    super.key,
     required this.text,
     required this.color,
     required this.onMinimize,
+    required this.onClose,
   });
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      key: const ValueKey("expanded"),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: Color(color),
         borderRadius: BorderRadius.circular(20),
+        boxShadow: const [BoxShadow(blurRadius: 8, color: Colors.black26)],
       ),
       child: IntrinsicHeight(
         child: Row(
@@ -144,7 +200,7 @@ class _ExpandedView extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               children: [
                 GestureDetector(
-                  onTap: FlutterOverlayWindow.closeOverlay,
+                  onTap: onClose,
                   child: const Icon(Icons.close, color: Colors.white, size: 18),
                 ),
                 const SizedBox(height: 6),
@@ -169,12 +225,11 @@ class _ExpandedView extends StatelessWidget {
 
 class _BubbleView extends StatelessWidget {
   final int color;
-  const _BubbleView({required this.color});
+  const _BubbleView({super.key, required this.color});
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      key: const ValueKey("bubble"),
       width: 60,
       height: 60,
       decoration: BoxDecoration(

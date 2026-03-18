@@ -18,7 +18,13 @@ class Homepage extends StatefulWidget {
   State<Homepage> createState() => _HomepageState();
 }
 
+// Track which notes currently have an active overlay
+final Set<int> _activeOverlayIds = {};
+
 Future<void> showOverlay(Notes note) async {
+  // If this note is already shown, do nothing
+  if (_activeOverlayIds.contains(note.id)) return;
+
   bool permitted = await FlutterOverlayWindow.isPermissionGranted();
 
   if (!permitted) {
@@ -27,21 +33,44 @@ Future<void> showOverlay(Notes note) async {
 
   if (!permitted) return;
 
-  await FlutterOverlayWindow.showOverlay(
-    width: 800,
-    height: 600,
-    enableDrag: true,
-    alignment: OverlayAlignment.center,
-    flag: OverlayFlag.defaultFlag,
-  );
+  // Check if the overlay window is actually active (not just our flag)
+  final bool isActive = await FlutterOverlayWindow.isActive();
+  print("Overlay is active: $isActive");
+  if (!isActive) {
+    // Reset tracking in case of stale state
+    _activeOverlayIds.clear();
 
-  await Future.delayed(const Duration(milliseconds: 400));
+    await FlutterOverlayWindow.showOverlay(
+      width: 800,
+      height: 600,
+      enableDrag: true,
+      alignment: OverlayAlignment.center,
+      flag: OverlayFlag.defaultFlag,
+    );
+    await Future.delayed(const Duration(milliseconds: 400));
+  }
 
-  FlutterOverlayWindow.shareData({
+  _activeOverlayIds.add(note.id);
+
+  // Send "add" command to the overlay engine
+  await FlutterOverlayWindow.shareData({
+    "command": "add",
     "text": note.text,
     "color": note.color,
     "id": note.id,
   });
+}
+
+void removeOverlay(int noteId) {
+  _activeOverlayIds.remove(noteId);
+  FlutterOverlayWindow.shareData({
+    "command": "remove",
+    "id": noteId,
+  });
+}
+
+void onOverlayClosed(int noteId) {
+  _activeOverlayIds.remove(noteId);
 }
 
 class _HomepageState extends State<Homepage> {

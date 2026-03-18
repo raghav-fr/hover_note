@@ -19,6 +19,12 @@ void overlayMain() {
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  // Close any stale overlay from previous session (safe — won't crash if none exists)
+  try {
+    if (await FlutterOverlayWindow.isActive()) {
+      await FlutterOverlayWindow.closeOverlay();
+    }
+  } catch (_) {}
   await NotificationService.initialize();
   await NoteDatabase.initialize();
 
@@ -48,10 +54,15 @@ class _MyAppState extends State<MyApp> {
     // --- THE GLOBAL BRIDGE LISTENER ---
     // This catches the message from the Overlay Engine
     FlutterOverlayWindow.overlayListener.listen((data) {
-      if (data is Map && data['command'] == 'open_edit_page') {
-        // Since we are in the Main Engine, the MethodChannel is registered!
-        // This triggers the Kotlin code to bring the app to the front.
-        _channel.invokeMethod('openEditPage', {'id': data['id']});
+      if (data is Map) {
+        if (data['command'] == 'open_edit_page') {
+          // Since we are in the Main Engine, the MethodChannel is registered!
+          // This triggers the Kotlin code to bring the app to the front.
+          _channel.invokeMethod('openEditPage', {'id': data['id']});
+        } else if (data['command'] == 'overlay_closed') {
+          // Keep the main app's active overlay tracking in sync
+          onOverlayClosed(data['id']);
+        }
       }
     });
   }
