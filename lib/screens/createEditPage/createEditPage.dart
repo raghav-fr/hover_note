@@ -2,11 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_colorpicker/flutter_colorpicker.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:hover_note/constants/AppTextStyle.dart';
-import 'package:hover_note/models/Notes.dart';
+import 'package:hover_note/models/notes.dart';
 import 'package:hover_note/models/note_database.dart';
 import 'package:provider/provider.dart';
 import 'package:sizer/sizer.dart';
 import 'package:intl/intl.dart';
+import 'package:share_plus/share_plus.dart';
 
 class Createeditpage extends StatefulWidget {
   final Notes editnote;
@@ -20,6 +21,8 @@ class _CreateeditpageState extends State<Createeditpage> {
   TextEditingController textController = TextEditingController();
   Color? currentcolor;
   DateTime? reminderDateTime;
+  bool _isDeleted = false;
+  bool _hasSaved = false;
 
   void colorchange(Color color) {
     setState(() {
@@ -32,6 +35,7 @@ class _CreateeditpageState extends State<Createeditpage> {
     super.initState();
     textController.text = widget.editnote.text;
     currentcolor = Color(widget.editnote.color);
+    reminderDateTime = widget.editnote.scheduledAt;
   }
 
   Future<void> _pickReminderDateTime() async {
@@ -72,7 +76,13 @@ class _CreateeditpageState extends State<Createeditpage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return PopScope(
+      canPop: true,
+      onPopInvokedWithResult: (didPop, result) {
+        if (_isDeleted || _hasSaved) return;
+        _saveNote();
+      },
+      child: Scaffold(
       appBar: PreferredSize(
         preferredSize: Size(80.w, 6.h),
         child: SafeArea(
@@ -81,53 +91,11 @@ class _CreateeditpageState extends State<Createeditpage> {
             children: [
               IconButton(
                 onPressed: () {
-                  if (textController.text.isEmpty) {
-                    context.read<NoteDatabase>().deleteNote(widget.editnote.id);
-                    Navigator.pop(context);
-                  } else {
-                    textController.text==widget.editnote.text? Navigator.pop(context):
-                    showDialog(
-                      context: context,
-                      builder: (context) {
-                        return AlertDialog(
-                          title: Text("Save before exiting?"),
-                          content: Text(
-                            "You have unsaved changes. Do you want to save them?",
-                          ),
-                          actions: [
-                            TextButton(
-                              onPressed: () {
-                                if (widget.editnote.text.isEmpty) {
-                                  context.read<NoteDatabase>().deleteNote(
-                                    widget.editnote.id,
-                                  );
-                                }
-                                Navigator.pop(context); // close dialog
-                                Navigator.pop(context); // close edit page
-                              },
-                              child: Text("Discard"),
-                            ),
-                            TextButton(
-                              onPressed: () {
-                                context.read<NoteDatabase>().updateNote(
-                                  widget.editnote.id,
-                                  textController.text,
-                                  currentcolor!,
-                                );
-                                Navigator.pop(context);
-                                Navigator.pop(context);
-                              },
-                              child: Text("Save"),
-                            ),
-                          ],
-                        );
-                      },
-                    );
-                  }
+                  Navigator.pop(context);
                 },
                 icon: FaIcon(
                   FontAwesomeIcons.arrowLeft,
-                  color: Colors.grey[600],
+                  color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
                   size: 2.2.h,
                 ),
               ),
@@ -146,56 +114,41 @@ class _CreateeditpageState extends State<Createeditpage> {
                     ),
                   ),
                   IconButton(
-                    onPressed: () {},
+                    onPressed: () {
+                      if (textController.text.isNotEmpty) {
+                        Share.share(textController.text);
+                      }
+                    },
                     icon: FaIcon(
                       FontAwesomeIcons.shareNodes,
-                      color: Colors.grey[600],
+                      color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
                       size: 2.2.h,
                     ),
                   ),
                   IconButton(
                     onPressed: () {
+                      setState(() {
+                        _isDeleted = true;
+                      });
                       context.read<NoteDatabase>().deleteNote(
                         widget.editnote.id,
                       );
-                      Navigator.pop(context, true);
+                      Navigator.pop(context);
                     },
                     icon: FaIcon(
                       FontAwesomeIcons.trash,
-                      color: Colors.grey[600],
+                      color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
                       size: 2.2.h,
                     ),
                   ),
                   IconButton(
                     onPressed: () {
-                      if (textController.text.isEmpty) {
-                        context.read<NoteDatabase>().deleteNote(
-                          widget.editnote.id,
-                        );
-                      } else {
-                        if (reminderDateTime != null) {
-                          context.read<NoteDatabase>().scheduleNoteReminder(
-                            textController.text,
-                            currentcolor!,
-                            reminderDateTime!,
-                          );
-                          context.read<NoteDatabase>().deleteNote(
-                          widget.editnote.id,
-                        );
-                        } else {
-                          context.read<NoteDatabase>().updateNote(
-                            widget.editnote.id,
-                            textController.text,
-                            currentcolor!,
-                          );
-                        }
-                      }
-                      textController.clear();
+                      _saveNote();
                       Navigator.pop(context);
                     },
                     icon: FaIcon(
                       FontAwesomeIcons.check,
-                      color: Colors.grey[600],
+                      color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
                       size: 2.2.h,
                     ),
                   ),
@@ -247,12 +200,20 @@ class _CreateeditpageState extends State<Createeditpage> {
                   ),
                 ),
                 if (reminderDateTime != null) ...[
-                  SizedBox(width: 10),
+                  SizedBox(width: 3.w),
                   Text(
                     _formattedReminder(),
-                    style: AppTextStyle.aristabold16.copyWith(
+                    style: AppTextStyle.aristabold17.copyWith(
                       color: Colors.grey[500],
                     ),
+                  ),
+                  IconButton(
+                    icon: Icon(Icons.close, color: Colors.grey[500], size: 2.h),
+                    onPressed: () {
+                      setState(() {
+                        reminderDateTime = null;
+                      });
+                    },
                   ),
                 ],
               ],
@@ -269,7 +230,7 @@ class _CreateeditpageState extends State<Createeditpage> {
               keyboardType: TextInputType.multiline,
               style: AppTextStyle.aristabold19,
               decoration: InputDecoration(
-                hintStyle: TextStyle(color: Colors.grey[400]),
+                hintStyle: TextStyle(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.4)),
                 hintText: ' Enter your message here...',
                 border: const OutlineInputBorder(borderSide: BorderSide.none),
               ),
@@ -277,6 +238,34 @@ class _CreateeditpageState extends State<Createeditpage> {
           ),
         ],
       ),
+    ),
     );
+  }
+
+  void _saveNote() {
+    if (_isDeleted || _hasSaved) return;
+    _hasSaved = true;
+
+    if (textController.text.trim().isEmpty) {
+      context.read<NoteDatabase>().deleteNote(widget.editnote.id);
+    } else {
+      if (reminderDateTime != null) {
+        context.read<NoteDatabase>().scheduleNoteReminder(
+          widget.editnote.id,
+          textController.text,
+          currentcolor!,
+          reminderDateTime!,
+        );
+      } else {
+        if (widget.editnote.isScheduled) {
+          context.read<NoteDatabase>().cancelSchedule(widget.editnote.id);
+        }
+        context.read<NoteDatabase>().updateNote(
+          widget.editnote.id,
+          textController.text,
+          currentcolor!,
+        );
+      }
+    }
   }
 }

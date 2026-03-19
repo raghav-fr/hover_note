@@ -8,4 +8,12 @@ class Notes {
   late String text="";
   DateTime date = DateTime.now();
   late int color;
+  bool isPinned = false;
+
+  // Phase 2: Trash and Scheduled properties
+  bool isDeleted = false;
+  DateTime? deletedAt;
+  
+  bool isScheduled = false;
+  DateTime? scheduledAt;
 }

@@ -2,14 +2,18 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'package:hover_note/constants/AppTextStyle.dart';
-import 'package:hover_note/models/Notes.dart';
+import 'package:hover_note/models/notes.dart';
 import 'package:hover_note/models/note_database.dart';
 import 'package:hover_note/screens/createEditPage/createEditPage.dart';
-// import 'package:intl/date_symbols.dart';
 import 'package:page_transition/page_transition.dart';
 import 'package:provider/provider.dart';
 import 'package:sizer/sizer.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
+import 'package:hover_note/screens/trash/TrashPage.dart';
+import 'package:hover_note/screens/scheduled/ScheduledPage.dart';
+import 'package:hover_note/screens/settings/SettingsPage.dart';
+import 'package:hover_note/components/note_container.dart';
+import 'package:share_plus/share_plus.dart';
 
 class Homepage extends StatefulWidget {
   const Homepage({super.key});
@@ -25,50 +29,30 @@ const MethodChannel _overlayChannel = MethodChannel('overlay_launcher');
 final Set<int> _activeOverlayIds = {};
 
 /// Shows a native floating overlay window for the given note.
-/// Each note gets its own independent, draggable window via NativeOverlayService.
 Future<void> showOverlay(Notes note) async {
-  debugPrint("[OVERLAY] showOverlay called for note id=${note.id}");
-  
   try {
-    // Check overlay permission via native code
     final bool permitted = await _overlayChannel.invokeMethod('checkOverlayPermission');
-    debugPrint("[OVERLAY] Permission check result: $permitted");
-
     if (!permitted) {
-      debugPrint("[OVERLAY] Requesting overlay permission...");
       await _overlayChannel.invokeMethod('requestOverlayPermission');
-      return; // User needs to grant permission in Settings, then try again
-    }
-
-    // If this note already has an active overlay, don't create a duplicate
-    if (_activeOverlayIds.contains(note.id)) {
-      debugPrint("[OVERLAY] Note ${note.id} already has active overlay, skipping");
       return;
     }
-
+    if (_activeOverlayIds.contains(note.id)) return;
     _activeOverlayIds.add(note.id);
-
-    debugPrint("[OVERLAY] Calling showNativeOverlay for id=${note.id}, text='${note.text}', color=${note.color}");
-    // Tell the native NativeOverlayService to create a new floating window
     await _overlayChannel.invokeMethod('showNativeOverlay', {
       'id': note.id,
       'text': note.text,
       'color': note.color,
     });
-    debugPrint("[OVERLAY] showNativeOverlay call completed successfully");
-  } catch (e, stack) {
+  } catch (e) {
     debugPrint("[OVERLAY] ERROR: $e");
-    debugPrint("[OVERLAY] Stack: $stack");
   }
 }
 
-/// Removes a specific note's native overlay window.
 void removeOverlay(int noteId) {
   _activeOverlayIds.remove(noteId);
   _overlayChannel.invokeMethod('closeNativeOverlay', {'id': noteId});
 }
 
-/// Called when the native service reports an overlay was closed (user tapped ✕).
 void onOverlayClosed(int noteId) {
   _activeOverlayIds.remove(noteId);
 }
@@ -86,6 +70,10 @@ class _HomepageState extends State<Homepage> {
   final TextEditingController _searchController = TextEditingController();
   bool _isSearching = false;
   String _searchQuery = "";
+
+  // --- Selection Mode ---
+  bool _isSelectionMode = false;
+  final Set<int> _selectedNoteIds = {};
 
   void _loadBannerAd() {
     _bannerAd = BannerAd(
@@ -124,18 +112,10 @@ class _HomepageState extends State<Homepage> {
   Future<void> _checkLaunchIntent() async {
     try {
       final Map? data = await _channel.invokeMethod('getInitialIntent');
-
       if (data != null && data['open_edit'] == true) {
         final id = data['note_id'];
-
-        final note = context.read<NoteDatabase>().currentNotes.firstWhere(
-          (n) => n.id == id,
-        );
-        print("Opening edit page for note id: $id with text: ${note.text}");
-        Navigator.push(
-          context,
-          MaterialPageRoute(builder: (_) => Createeditpage(editnote: note)),
-        );
+        final note = context.read<NoteDatabase>().currentNotes.firstWhere((n) => n.id == id);
+        Navigator.push(context, MaterialPageRoute(builder: (_) => Createeditpage(editnote: note)));
       }
     } catch (e) {
       debugPrint("Intent read error: $e");
@@ -146,323 +126,340 @@ class _HomepageState extends State<Homepage> {
     context.read<NoteDatabase>().fetchNotes();
   }
 
+  void openCreateEditPage({Notes? note}) async {
+    final shouldRefresh = await Navigator.push(
+      context,
+      PageTransition(
+        type: PageTransitionType.bottomToTop,
+        child: Createeditpage(editnote: note!),
+      ),
+    );
+    if (shouldRefresh == true) readNotes();
+  }
+
   @override
   Widget build(BuildContext context) {
     final noteDatabase = context.watch<NoteDatabase>();
-
     List<Notes> currentNotes = noteDatabase.currentNotes;
-
-    // Filter notes based on search query
     List<Notes> filteredNotes = currentNotes.where((note) {
       return note.text.toLowerCase().contains(_searchQuery.toLowerCase());
     }).toList();
 
-    void openCreateEditPage({Notes? note}) async {
-      final shouldRefresh = await Navigator.push(
-        context,
-        PageTransition(
-          type: PageTransitionType.bottomToTop,
-          child: Createeditpage(editnote: note!),
-        ),
-      );
-
-      if (shouldRefresh == true) {
-        readNotes(); // Reload after delete or save
-      }
-    }
-
-    return Scaffold(
-      key: _scaffoldKey,
-      drawer: Drawer(
-        backgroundColor: Colors.white,
-        child: Column(
-          children: [
-            DrawerHeader(
-              decoration: BoxDecoration(color: Color.fromRGBO(255, 205, 7, 1)),
-              child: Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Image.asset(
-                      "assets/images/emptynote.png", // Reusing your existing image as a logo
-                      height: 8.h,
-                    ),
-                    SizedBox(height: 1.h),
-                    Text(
-                      "Hover Note",
-                      style: AppTextStyle.aristabold20.copyWith(
-                        color: Colors.white,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            ListTile(
-              leading: FaIcon(
-                FontAwesomeIcons.noteSticky,
-                color: Color.fromRGBO(255, 205, 7, 1),
-              ),
-              title: Text("All Notes", style: AppTextStyle.aristabold17),
-              onTap: () => Navigator.pop(context),
-            ),
-            ListTile(
-              leading: Icon(
-                Icons.settings_rounded,
-                color: Color.fromRGBO(255, 205, 7, 1),
-              ),
-              title: Text("Settings", style: AppTextStyle.aristabold17),
-              onTap: () {},
-            ),
-            ListTile(
-              leading: Icon(
-                Icons.info_rounded,
-                color: Color.fromRGBO(255, 205, 7, 1),
-              ),
-              title: Text("About", style: AppTextStyle.aristabold17),
-              onTap: () {},
-            ),
-          ],
-        ),
-      ),
-      appBar: PreferredSize(
-        preferredSize: Size(100.w, 8.h),
-        child: SafeArea(
-          child: Container(
-            padding: EdgeInsets.symmetric(horizontal: 4.w, vertical: 1.h),
-            color: Colors.white,
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                // Menu Icon + Title (or Search Field)
-                Expanded(
-                  child: Row(
-                    children: [
-                      if (!_isSearching)
-                        GestureDetector(
-                          onTap: () => _scaffoldKey.currentState?.openDrawer(),
-                          child: Container(
-                            height: 5.h,
-                            padding: EdgeInsets.symmetric(horizontal: 3.w),
-                            decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(30),
-                              color: Color.fromRGBO(255, 205, 7, 1),
-                            ),
-                            child: Row(
-                              children: [
-                                FaIcon(
-                                  FontAwesomeIcons.bars,
-                                  color: Colors.white,
-                                  size: 2.h,
-                                ),
-                                SizedBox(width: 3.w),
-                                Text(
-                                  "Hover Note",
-                                  style: AppTextStyle.aristabold20.copyWith(
-                                    color: Colors.white,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      if (_isSearching)
-                        Expanded(
-                          child: Container(
-                            height: 5.h,
-                            padding: EdgeInsets.symmetric(horizontal: 4.w),
-                            decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(30),
-                              color: Colors.grey[100],
-                            ),
-                            child: TextField(
-                              controller: _searchController,
-                              autofocus: true,
-                              onChanged: (val) {
-                                setState(() {
-                                  _searchQuery = val;
-                                });
-                              },
-                              style: AppTextStyle.aristabold17,
-                              decoration: InputDecoration(
-                                hintText: "Search notes...",
-                                border: InputBorder.none,
-                                hintStyle: AppTextStyle.aristabold17.copyWith(
-                                  color: Colors.grey,
-                                ),
-                                icon: FaIcon(
-                                  FontAwesomeIcons.magnifyingGlass,
-                                  color: Color.fromRGBO(255, 205, 7, 1),
-                                  size: 2.h,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                    ],
-                  ),
-                ),
-                SizedBox(width: 3.w),
-                // Search Toggle Button
-                GestureDetector(
-                  onTap: () {
-                    setState(() {
-                      if (_isSearching) {
-                        _isSearching = false;
-                        _searchQuery = "";
-                        _searchController.clear();
-                      } else {
-                        _isSearching = true;
-                      }
-                    });
-                  },
-                  child: Container(
-                    height: 5.h,
-                    width: 5.h,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color:
-                          _isSearching
-                              ? Colors.redAccent
-                              : Color.fromRGBO(20, 255, 20, 1),
-                    ),
+    return PopScope(
+      canPop: !_isSelectionMode,
+      onPopInvokedWithResult: (didPop, result) {
+        if (!didPop && _isSelectionMode) {
+          setState(() {
+            _isSelectionMode = false;
+            _selectedNoteIds.clear();
+          });
+        }
+      },
+      child: Scaffold(
+        key: _scaffoldKey,
+        drawer: Drawer(
+          backgroundColor: Theme.of(context).colorScheme.surface,
+          child: Column(
+            children: [
+              Container(
+                decoration: const BoxDecoration(color: Color.fromRGBO(255, 205, 7, 1)),
+                child: SafeArea(
+                  bottom: false,
+                  child: SizedBox(
+                    width: double.infinity,
+                    height: 20.h,
                     child: Center(
-                      child: FaIcon(
-                        _isSearching
-                            ? FontAwesomeIcons.xmark
-                            : FontAwesomeIcons.magnifyingGlass,
-                        color: Colors.white,
-                        size: 2.h,
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Image.asset("assets/images/drawerlogo.png", height: 8.h),
+                          SizedBox(height: 1.h),
+                          Text("Hover Note", style: AppTextStyle.aristabold20.copyWith(color: Colors.white)),
+                          SizedBox(height: 2.h),
+                        ],
                       ),
                     ),
                   ),
                 ),
-              ],
-            ),
+              ),
+              SizedBox(height: 2.h),
+              
+              ListTile(
+                leading: const FaIcon(FontAwesomeIcons.solidNoteSticky, color: Color.fromRGBO(255, 205, 7, 1)),
+                title: Text("All Notes", style: AppTextStyle.aristabold17.copyWith(color: Theme.of(context).colorScheme.primary)),
+                onTap: () => Navigator.pop(context),
+              ),
+              
+              ListTile(
+                leading: const FaIcon(FontAwesomeIcons.solidClock, color: Color.fromRGBO(255, 205, 7, 1)),
+                title: Text("Scheduled Notes", style: AppTextStyle.aristabold17.copyWith(color: Theme.of(context).colorScheme.primary)),
+                onTap: () {
+                  Navigator.pop(context);
+                  Navigator.push(context, MaterialPageRoute(builder: (context) => const ScheduledPage()));
+                },
+              ),
+              ListTile(
+                leading: const FaIcon(FontAwesomeIcons.trash, color: Color.fromRGBO(255, 205, 7, 1)),
+                title: Text("Trash", style: AppTextStyle.aristabold17.copyWith(color: Theme.of(context).colorScheme.primary)),
+                onTap: () {
+                  Navigator.pop(context);
+                  Navigator.push(context, MaterialPageRoute(builder: (context) => const TrashPage()));
+                },
+              ),
+              Divider(color: Colors.grey[300], indent: 4.w, endIndent: 4.w),
+              ListTile(
+                leading: const Icon(Icons.settings_rounded, color: Color.fromRGBO(255, 205, 7, 1)),
+                title: Text("Settings", style: AppTextStyle.aristabold17.copyWith(color: Theme.of(context).colorScheme.primary)),
+                onTap: () {
+                  Navigator.pop(context);
+                  Navigator.push(context, MaterialPageRoute(builder: (context) => const SettingsPage()));
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.info_rounded, color: Color.fromRGBO(255, 205, 7, 1)),
+                title: Text("About", style: AppTextStyle.aristabold17.copyWith(color: Theme.of(context).colorScheme.primary)),
+                onTap: () {},
+              ),
+            ],
           ),
         ),
-      ),
-      backgroundColor: Colors.white,
-      floatingActionButton: FloatingActionButton(
-        elevation: 5,
-        backgroundColor: Color.fromRGBO(31, 77, 240, 1),
-        shape: CircleBorder(side: BorderSide(width: 1.5, color: Colors.white)),
-        onPressed: () async {
-          final newnote = await context.read<NoteDatabase>().createNote();
-          openCreateEditPage(note: newnote);
-        },
-        child: const Icon(Icons.add_rounded, size: 50, color: Colors.white),
-      ),
-      body: SafeArea(
-        child: RefreshIndicator(
-          onRefresh: () async {
-            await context.read<NoteDatabase>().fetchNotes();
-          },
-          child:
-              currentNotes.isEmpty
-                  ? CustomScrollView(
-                    slivers: [
-                      SliverFillRemaining(
-                        hasScrollBody: false,
-                        child: Center(
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
+        appBar: PreferredSize(
+          preferredSize: Size(100.w, 8.h),
+          child: SafeArea(
+            child: Container(
+              padding: EdgeInsets.symmetric(horizontal: 4.w, vertical: 1.h),
+              color: Theme.of(context).colorScheme.surface,
+              child: _isSelectionMode
+                  ? Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Row(
+                          children: [
+                            IconButton(
+                              icon: Icon(Icons.close, color: Theme.of(context).colorScheme.primary),
+                              onPressed: () => setState(() { _isSelectionMode = false; _selectedNoteIds.clear(); }),
+                            ),
+                            SizedBox(width: 2.w),
+                            Text("${_selectedNoteIds.length} Selected", style: AppTextStyle.aristabold17.copyWith(color: Theme.of(context).colorScheme.primary)),
+                          ],
+                        ),
+                        Row(
+                          children: [
+                            IconButton(
+                              icon: Icon(Icons.push_pin_rounded, color: Theme.of(context).colorScheme.primary),
+                              onPressed: _pinSelectedNotes,
+                            ),
+                            IconButton(
+                              icon: Icon(Icons.share_rounded, color: Theme.of(context).colorScheme.primary),
+                              onPressed: _shareSelectedNotes,
+                            ),
+                            IconButton(icon: const Icon(Icons.delete_rounded, color: Colors.redAccent), onPressed: _deleteSelectedNotes),
+                          ],
+                        ),
+                      ],
+                    )
+                  : Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Expanded(
+                          child: Row(
                             children: [
-                              Image(
-                                width: 50.w,
-                                image: AssetImage("assets/images/emptynote.png"),
-                              ),
-                              if (_isSearching && _searchQuery.isNotEmpty)
-                                Padding(
-                                  padding: EdgeInsets.only(top: 2.h),
-                                  child: Text(
-                                    "No matches found for '$_searchQuery'",
-                                    style: AppTextStyle.aristabold17.copyWith(color: Colors.grey),
+                              if (!_isSearching)
+                                GestureDetector(
+                                  onTap: () => _scaffoldKey.currentState?.openDrawer(),
+                                  child: Container(
+                                    height: 5.h,
+                                    padding: EdgeInsets.symmetric(horizontal: 3.w),
+                                    decoration: BoxDecoration(borderRadius: BorderRadius.circular(30), color: const Color.fromRGBO(255, 205, 7, 1)),
+                                    child: Row(
+                                      children: [
+                                        FaIcon(FontAwesomeIcons.bars, color: Colors.white, size: 2.h),
+                                        SizedBox(width: 3.w),
+                                        Text("Hover Note", style: AppTextStyle.aristabold20.copyWith(color: Colors.white)),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              if (_isSearching)
+                                Expanded(
+                                  child: Container(
+                                    height: 5.h,
+                                    padding: EdgeInsets.symmetric(horizontal: 4.w),
+                                    decoration: BoxDecoration(borderRadius: BorderRadius.circular(30), color: Colors.grey[100]),
+                                    child: TextField(
+                                      controller: _searchController,
+                                      autofocus: true,
+                                      onChanged: (val) => setState(() => _searchQuery = val),
+                                      style: AppTextStyle.aristabold17,
+                                      decoration: InputDecoration(
+                                        hintText: "Search notes...",
+                                        border: InputBorder.none,
+                                        hintStyle: AppTextStyle.aristabold17.copyWith(color: Colors.grey),
+                                        icon: FaIcon(FontAwesomeIcons.magnifyingGlass, color: const Color.fromRGBO(255, 205, 7, 1), size: 2.h),
+                                      ),
+                                    ),
                                   ),
                                 ),
                             ],
                           ),
                         ),
+                        SizedBox(width: 3.w),
+                        GestureDetector(
+                          onTap: () {
+                            setState(() {
+                              if (_isSearching) {
+                                _isSearching = false;
+                                _searchQuery = "";
+                                _searchController.clear();
+                              } else {
+                                _isSearching = true;
+                              }
+                            });
+                          },
+                          child: Container(
+                            height: 5.h,
+                            width: 5.h,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: _isSearching ? Colors.redAccent : const Color.fromRGBO(20, 255, 20, 1),
+                            ),
+                            child: Center(
+                              child: FaIcon(_isSearching ? FontAwesomeIcons.xmark : FontAwesomeIcons.magnifyingGlass, color: Colors.white, size: 2.h),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+            ),
+          ),
+        ),
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+        floatingActionButton: FloatingActionButton(
+          elevation: 5,
+          backgroundColor: const Color.fromRGBO(31, 77, 240, 1),
+          shape: const CircleBorder(side: BorderSide(width: 1.5, color: Colors.white)),
+          onPressed: () async {
+            final newnote = await context.read<NoteDatabase>().createNote();
+            openCreateEditPage(note: newnote);
+          },
+          child: const Icon(Icons.add_rounded, size: 50, color: Colors.white),
+        ),
+        body: SafeArea(
+          child: RefreshIndicator(
+            onRefresh: () async => await context.read<NoteDatabase>().fetchNotes(),
+            child: currentNotes.isEmpty
+                ? CustomScrollView(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    slivers: [
+                      SliverFillRemaining(
+                        hasScrollBody: false,
+                        child: Container(
+                          padding: EdgeInsets.only(bottom: 10.h),
+                          child: Center(
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Image(width: 50.w, image: const AssetImage("assets/images/drawerlogo.png")),
+                                Padding(
+                                  padding: EdgeInsets.only(top: 2.h),
+                                  child: Text("No notes yet!", textAlign: TextAlign.center, style: AppTextStyle.aristabold17.copyWith(color: Colors.grey)),
+                                ),
+                                if (_isSearching && _searchQuery.isNotEmpty)
+                                  Padding(
+                                    padding: EdgeInsets.only(top: 2.h),
+                                    child: Text("No matches found for '$_searchQuery'", style: AppTextStyle.aristabold17.copyWith(color: Colors.grey)),
+                                  ),
+                              ],
+                            ),
+                          ),
+                        ),
                       ),
                     ],
                   )
-                  : ListView.builder(
+                : ListView.builder(
                     itemCount: filteredNotes.length,
                     itemBuilder: (context, index) {
                       final note = filteredNotes[index];
-                      return InkWell(
+                      final isSelected = _selectedNoteIds.contains(note.id);
+                      return NoteContainer(
+                        notes: note,
+                        width: 80.w,
+                        text: note.text,
+                        color: Color(note.color),
+                        isSelected: isSelected,
+                        onLongPress: () { if (!_isSelectionMode) setState(() { _isSelectionMode = true; _selectedNoteIds.add(note.id); }); },
                         onTap: () {
-                          openCreateEditPage(note: note);
+                          if (_isSelectionMode) {
+                            setState(() {
+                              if (isSelected) {
+                                _selectedNoteIds.remove(note.id);
+                                if (_selectedNoteIds.isEmpty) _isSelectionMode = false;
+                              } else {
+                                _selectedNoteIds.add(note.id);
+                              }
+                            });
+                          } else {
+                            openCreateEditPage(note: note);
+                          }
                         },
-                        child: customContainer(
-                          notes: note,
-                          width: 80.w,
-                          text: note.text,
-                          color: Color(note.color),
-                        ),
                       );
                     },
                   ),
+          ),
         ),
+        bottomNavigationBar: _isBannerAdLoaded && _bannerAd != null
+            ? SizedBox(height: _bannerAd!.size.height.toDouble(), width: double.infinity, child: AdWidget(ad: _bannerAd!))
+            : const SizedBox.shrink(),
       ),
-      bottomNavigationBar: _isBannerAdLoaded && _bannerAd != null
-          ? SizedBox(
-              height: _bannerAd!.size.height.toDouble(),
-              width: double.infinity,
-              child: AdWidget(ad: _bannerAd!),
-            )
-          : const SizedBox.shrink(),
     );
   }
-}
 
-class customContainer extends StatelessWidget {
-  final Notes? notes;
-  final double? width;
-  final Color? color;
-  final String? text;
-  const customContainer({
-    super.key,
-    this.color,
-    this.text,
-    this.width,
-    this.notes,
-  });
+  void _shareSelectedNotes() {
+    if (_selectedNoteIds.isEmpty) return;
+    final notesToShare = context.read<NoteDatabase>().currentNotes
+        .where((n) => _selectedNoteIds.contains(n.id))
+        .map((n) => n.text)
+        .join('\n\n---\n\n');
+    Share.share(notesToShare);
+    setState(() { _isSelectionMode = false; _selectedNoteIds.clear(); });
+  }
 
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: EdgeInsets.symmetric(horizontal: 3.w, vertical: 1.h),
-      margin: EdgeInsets.all(10),
-      width: width,
-      decoration: BoxDecoration(
-        color: color,
-        borderRadius: BorderRadius.circular(10),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Expanded(
-            child: Text(
-              text!,
-              maxLines: 5,
-              style: AppTextStyle.aristabold17.copyWith(color: Colors.white),
+  void _pinSelectedNotes() async {
+    if (_selectedNoteIds.isEmpty) return;
+    final db = context.read<NoteDatabase>();
+    final selectedNotes = db.currentNotes.where((n) => _selectedNoteIds.contains(n.id)).toList();
+    final allPinned = selectedNotes.every((n) => n.isPinned);
+    
+    for (final note in selectedNotes) {
+      await db.updateNotePin(note.id, !allPinned);
+    }
+    setState(() { _isSelectionMode = false; _selectedNoteIds.clear(); });
+  }
+
+  void _deleteSelectedNotes() {
+    if (_selectedNoteIds.isEmpty) return;
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          title: Text("Move to Trash", style: AppTextStyle.aristabold20),
+          content: Text("Are you sure you want to move ${_selectedNoteIds.length} notes to trash?", style: AppTextStyle.aristabold17),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(context), child: Text("Cancel", style: AppTextStyle.aristabold17.copyWith(color: Colors.grey))),
+            TextButton(
+              onPressed: () async {
+                Navigator.pop(context);
+                final db = context.read<NoteDatabase>();
+                for (final id in _selectedNoteIds) await db.deleteNote(id);
+                setState(() { _isSelectionMode = false; _selectedNoteIds.clear(); });
+              },
+              child: Text("Delete", style: AppTextStyle.aristabold17.copyWith(color: Colors.redAccent)),
             ),
-          ),
-          GestureDetector(
-            onTap: () => showOverlay(notes!),
-            child: Container(
-              padding: EdgeInsets.only(top: 0.5.h, left: 2.5.w),
-              child: FaIcon(
-                FontAwesomeIcons.play,
-                color: Colors.white,
-                size: 2.h,
-              ),
-            ),
-          ),
-        ],
-      ),
+          ],
+        );
+      },
     );
   }
 }

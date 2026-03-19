@@ -7,7 +7,7 @@ class NotificationService {
     // ✅ Initialize timezone
     tzData.initializeTimeZones();
 
-    await AwesomeNotifications().initialize(null, [
+    await AwesomeNotifications().initialize('resource://drawable/notification_icon', [
       NotificationChannel(
         channelKey: 'basic_channel',
         channelName: 'Basic Notifications',

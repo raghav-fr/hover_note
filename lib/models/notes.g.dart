@@ -1,6 +1,6 @@
 // GENERATED CODE - DO NOT MODIFY BY HAND
 
-part of 'Notes.dart';
+part of 'notes.dart';
 
 // **************************************************************************
 // IsarCollectionGenerator
@@ -27,8 +27,33 @@ const NotesSchema = CollectionSchema(
       name: r'date',
       type: IsarType.dateTime,
     ),
-    r'text': PropertySchema(
+    r'deletedAt': PropertySchema(
       id: 2,
+      name: r'deletedAt',
+      type: IsarType.dateTime,
+    ),
+    r'isDeleted': PropertySchema(
+      id: 3,
+      name: r'isDeleted',
+      type: IsarType.bool,
+    ),
+    r'isPinned': PropertySchema(
+      id: 4,
+      name: r'isPinned',
+      type: IsarType.bool,
+    ),
+    r'isScheduled': PropertySchema(
+      id: 5,
+      name: r'isScheduled',
+      type: IsarType.bool,
+    ),
+    r'scheduledAt': PropertySchema(
+      id: 6,
+      name: r'scheduledAt',
+      type: IsarType.dateTime,
+    ),
+    r'text': PropertySchema(
+      id: 7,
       name: r'text',
       type: IsarType.string,
     )
@@ -65,7 +90,12 @@ void _notesSerialize(
 ) {
   writer.writeLong(offsets[0], object.color);
   writer.writeDateTime(offsets[1], object.date);
-  writer.writeString(offsets[2], object.text);
+  writer.writeDateTime(offsets[2], object.deletedAt);
+  writer.writeBool(offsets[3], object.isDeleted);
+  writer.writeBool(offsets[4], object.isPinned);
+  writer.writeBool(offsets[5], object.isScheduled);
+  writer.writeDateTime(offsets[6], object.scheduledAt);
+  writer.writeString(offsets[7], object.text);
 }
 
 Notes _notesDeserialize(
@@ -77,8 +107,13 @@ Notes _notesDeserialize(
   final object = Notes();
   object.color = reader.readLong(offsets[0]);
   object.date = reader.readDateTime(offsets[1]);
+  object.deletedAt = reader.readDateTimeOrNull(offsets[2]);
   object.id = id;
-  object.text = reader.readString(offsets[2]);
+  object.isDeleted = reader.readBool(offsets[3]);
+  object.isPinned = reader.readBool(offsets[4]);
+  object.isScheduled = reader.readBool(offsets[5]);
+  object.scheduledAt = reader.readDateTimeOrNull(offsets[6]);
+  object.text = reader.readString(offsets[7]);
   return object;
 }
 
@@ -94,6 +129,16 @@ P _notesDeserializeProp<P>(
     case 1:
       return (reader.readDateTime(offset)) as P;
     case 2:
+      return (reader.readDateTimeOrNull(offset)) as P;
+    case 3:
+      return (reader.readBool(offset)) as P;
+    case 4:
+      return (reader.readBool(offset)) as P;
+    case 5:
+      return (reader.readBool(offset)) as P;
+    case 6:
+      return (reader.readDateTimeOrNull(offset)) as P;
+    case 7:
       return (reader.readString(offset)) as P;
     default:
       throw IsarError('Unknown property with id $propertyId');
@@ -293,6 +338,75 @@ extension NotesQueryFilter on QueryBuilder<Notes, Notes, QFilterCondition> {
     });
   }
 
+  QueryBuilder<Notes, Notes, QAfterFilterCondition> deletedAtIsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNull(
+        property: r'deletedAt',
+      ));
+    });
+  }
+
+  QueryBuilder<Notes, Notes, QAfterFilterCondition> deletedAtIsNotNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNotNull(
+        property: r'deletedAt',
+      ));
+    });
+  }
+
+  QueryBuilder<Notes, Notes, QAfterFilterCondition> deletedAtEqualTo(
+      DateTime? value) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'deletedAt',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<Notes, Notes, QAfterFilterCondition> deletedAtGreaterThan(
+    DateTime? value, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'deletedAt',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<Notes, Notes, QAfterFilterCondition> deletedAtLessThan(
+    DateTime? value, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'deletedAt',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<Notes, Notes, QAfterFilterCondition> deletedAtBetween(
+    DateTime? lower,
+    DateTime? upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'deletedAt',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+      ));
+    });
+  }
+
   QueryBuilder<Notes, Notes, QAfterFilterCondition> idEqualTo(Id value) {
     return QueryBuilder.apply(this, (query) {
       return query.addFilterCondition(FilterCondition.equalTo(
@@ -337,6 +451,105 @@ extension NotesQueryFilter on QueryBuilder<Notes, Notes, QFilterCondition> {
     return QueryBuilder.apply(this, (query) {
       return query.addFilterCondition(FilterCondition.between(
         property: r'id',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+      ));
+    });
+  }
+
+  QueryBuilder<Notes, Notes, QAfterFilterCondition> isDeletedEqualTo(
+      bool value) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'isDeleted',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<Notes, Notes, QAfterFilterCondition> isPinnedEqualTo(
+      bool value) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'isPinned',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<Notes, Notes, QAfterFilterCondition> isScheduledEqualTo(
+      bool value) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'isScheduled',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<Notes, Notes, QAfterFilterCondition> scheduledAtIsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNull(
+        property: r'scheduledAt',
+      ));
+    });
+  }
+
+  QueryBuilder<Notes, Notes, QAfterFilterCondition> scheduledAtIsNotNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNotNull(
+        property: r'scheduledAt',
+      ));
+    });
+  }
+
+  QueryBuilder<Notes, Notes, QAfterFilterCondition> scheduledAtEqualTo(
+      DateTime? value) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'scheduledAt',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<Notes, Notes, QAfterFilterCondition> scheduledAtGreaterThan(
+    DateTime? value, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'scheduledAt',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<Notes, Notes, QAfterFilterCondition> scheduledAtLessThan(
+    DateTime? value, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'scheduledAt',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<Notes, Notes, QAfterFilterCondition> scheduledAtBetween(
+    DateTime? lower,
+    DateTime? upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'scheduledAt',
         lower: lower,
         includeLower: includeLower,
         upper: upper,
@@ -503,6 +716,66 @@ extension NotesQuerySortBy on QueryBuilder<Notes, Notes, QSortBy> {
     });
   }
 
+  QueryBuilder<Notes, Notes, QAfterSortBy> sortByDeletedAt() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'deletedAt', Sort.asc);
+    });
+  }
+
+  QueryBuilder<Notes, Notes, QAfterSortBy> sortByDeletedAtDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'deletedAt', Sort.desc);
+    });
+  }
+
+  QueryBuilder<Notes, Notes, QAfterSortBy> sortByIsDeleted() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'isDeleted', Sort.asc);
+    });
+  }
+
+  QueryBuilder<Notes, Notes, QAfterSortBy> sortByIsDeletedDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'isDeleted', Sort.desc);
+    });
+  }
+
+  QueryBuilder<Notes, Notes, QAfterSortBy> sortByIsPinned() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'isPinned', Sort.asc);
+    });
+  }
+
+  QueryBuilder<Notes, Notes, QAfterSortBy> sortByIsPinnedDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'isPinned', Sort.desc);
+    });
+  }
+
+  QueryBuilder<Notes, Notes, QAfterSortBy> sortByIsScheduled() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'isScheduled', Sort.asc);
+    });
+  }
+
+  QueryBuilder<Notes, Notes, QAfterSortBy> sortByIsScheduledDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'isScheduled', Sort.desc);
+    });
+  }
+
+  QueryBuilder<Notes, Notes, QAfterSortBy> sortByScheduledAt() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'scheduledAt', Sort.asc);
+    });
+  }
+
+  QueryBuilder<Notes, Notes, QAfterSortBy> sortByScheduledAtDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'scheduledAt', Sort.desc);
+    });
+  }
+
   QueryBuilder<Notes, Notes, QAfterSortBy> sortByText() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'text', Sort.asc);
@@ -541,6 +814,18 @@ extension NotesQuerySortThenBy on QueryBuilder<Notes, Notes, QSortThenBy> {
     });
   }
 
+  QueryBuilder<Notes, Notes, QAfterSortBy> thenByDeletedAt() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'deletedAt', Sort.asc);
+    });
+  }
+
+  QueryBuilder<Notes, Notes, QAfterSortBy> thenByDeletedAtDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'deletedAt', Sort.desc);
+    });
+  }
+
   QueryBuilder<Notes, Notes, QAfterSortBy> thenById() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'id', Sort.asc);
@@ -550,6 +835,54 @@ extension NotesQuerySortThenBy on QueryBuilder<Notes, Notes, QSortThenBy> {
   QueryBuilder<Notes, Notes, QAfterSortBy> thenByIdDesc() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'id', Sort.desc);
+    });
+  }
+
+  QueryBuilder<Notes, Notes, QAfterSortBy> thenByIsDeleted() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'isDeleted', Sort.asc);
+    });
+  }
+
+  QueryBuilder<Notes, Notes, QAfterSortBy> thenByIsDeletedDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'isDeleted', Sort.desc);
+    });
+  }
+
+  QueryBuilder<Notes, Notes, QAfterSortBy> thenByIsPinned() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'isPinned', Sort.asc);
+    });
+  }
+
+  QueryBuilder<Notes, Notes, QAfterSortBy> thenByIsPinnedDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'isPinned', Sort.desc);
+    });
+  }
+
+  QueryBuilder<Notes, Notes, QAfterSortBy> thenByIsScheduled() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'isScheduled', Sort.asc);
+    });
+  }
+
+  QueryBuilder<Notes, Notes, QAfterSortBy> thenByIsScheduledDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'isScheduled', Sort.desc);
+    });
+  }
+
+  QueryBuilder<Notes, Notes, QAfterSortBy> thenByScheduledAt() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'scheduledAt', Sort.asc);
+    });
+  }
+
+  QueryBuilder<Notes, Notes, QAfterSortBy> thenByScheduledAtDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'scheduledAt', Sort.desc);
     });
   }
 
@@ -579,6 +912,36 @@ extension NotesQueryWhereDistinct on QueryBuilder<Notes, Notes, QDistinct> {
     });
   }
 
+  QueryBuilder<Notes, Notes, QDistinct> distinctByDeletedAt() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'deletedAt');
+    });
+  }
+
+  QueryBuilder<Notes, Notes, QDistinct> distinctByIsDeleted() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'isDeleted');
+    });
+  }
+
+  QueryBuilder<Notes, Notes, QDistinct> distinctByIsPinned() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'isPinned');
+    });
+  }
+
+  QueryBuilder<Notes, Notes, QDistinct> distinctByIsScheduled() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'isScheduled');
+    });
+  }
+
+  QueryBuilder<Notes, Notes, QDistinct> distinctByScheduledAt() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'scheduledAt');
+    });
+  }
+
   QueryBuilder<Notes, Notes, QDistinct> distinctByText(
       {bool caseSensitive = true}) {
     return QueryBuilder.apply(this, (query) {
@@ -603,6 +966,36 @@ extension NotesQueryProperty on QueryBuilder<Notes, Notes, QQueryProperty> {
   QueryBuilder<Notes, DateTime, QQueryOperations> dateProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'date');
+    });
+  }
+
+  QueryBuilder<Notes, DateTime?, QQueryOperations> deletedAtProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'deletedAt');
+    });
+  }
+
+  QueryBuilder<Notes, bool, QQueryOperations> isDeletedProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'isDeleted');
+    });
+  }
+
+  QueryBuilder<Notes, bool, QQueryOperations> isPinnedProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'isPinned');
+    });
+  }
+
+  QueryBuilder<Notes, bool, QQueryOperations> isScheduledProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'isScheduled');
+    });
+  }
+
+  QueryBuilder<Notes, DateTime?, QQueryOperations> scheduledAtProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'scheduledAt');
     });
   }
 

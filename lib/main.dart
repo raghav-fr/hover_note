@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
+import 'package:hover_note/constants/AppTheme.dart';
 import 'package:hover_note/models/note_database.dart';
 import 'package:hover_note/screens/homepage/HomePage.dart';
 import 'package:hover_note/services/notification_service/notification_service.dart';
+import 'package:hover_note/services/theme_service/theme_provider.dart';
 import 'package:provider/provider.dart';
 import 'package:sizer/sizer.dart';
 
@@ -17,8 +19,11 @@ void main() async {
   await NoteDatabase.initialize();
 
   runApp(
-    ChangeNotifierProvider(
-      create: (context) => NoteDatabase(),
+    MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (context) => NoteDatabase()),
+        ChangeNotifierProvider(create: (context) => ThemeProvider()),
+      ],
       child: const MyApp(),
     ),
   );
@@ -84,16 +89,20 @@ class _MyAppState extends State<MyApp> {
 
   @override
   Widget build(BuildContext context) {
+    final themeProvider = Provider.of<ThemeProvider>(context);
+
     return Sizer(
       builder: (context, _, _) {
         return MaterialApp(
           navigatorKey: navigatorKey, // Attach the global key here
           debugShowCheckedModeBanner: false,
           title: 'Hover Note',
-          theme: ThemeData(),
+          theme: AppTheme.lightTheme,
+          darkTheme: AppTheme.darkTheme,
+          themeMode: themeProvider.themeMode,
           home: const Homepage(),
         );
       },
     );
   }
-}
+}
