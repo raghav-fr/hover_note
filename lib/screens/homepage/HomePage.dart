@@ -81,6 +81,12 @@ class _HomepageState extends State<Homepage> {
   BannerAd? _bannerAd;
   bool _isBannerAdLoaded = false;
 
+  // --- Search & Sidebar ---
+  final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
+  final TextEditingController _searchController = TextEditingController();
+  bool _isSearching = false;
+  String _searchQuery = "";
+
   void _loadBannerAd() {
     _bannerAd = BannerAd(
       adUnitId: _adUnitId,
@@ -111,6 +117,7 @@ class _HomepageState extends State<Homepage> {
   @override
   void dispose() {
     _bannerAd?.dispose();
+    _searchController.dispose();
     super.dispose();
   }
 
@@ -145,6 +152,11 @@ class _HomepageState extends State<Homepage> {
 
     List<Notes> currentNotes = noteDatabase.currentNotes;
 
+    // Filter notes based on search query
+    List<Notes> filteredNotes = currentNotes.where((note) {
+      return note.text.toLowerCase().contains(_searchQuery.toLowerCase());
+    }).toList();
+
     void openCreateEditPage({Notes? note}) async {
       final shouldRefresh = await Navigator.push(
         context,
@@ -160,50 +172,168 @@ class _HomepageState extends State<Homepage> {
     }
 
     return Scaffold(
+      key: _scaffoldKey,
+      drawer: Drawer(
+        backgroundColor: Colors.white,
+        child: Column(
+          children: [
+            DrawerHeader(
+              decoration: BoxDecoration(color: Color.fromRGBO(255, 205, 7, 1)),
+              child: Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Image.asset(
+                      "assets/images/emptynote.png", // Reusing your existing image as a logo
+                      height: 8.h,
+                    ),
+                    SizedBox(height: 1.h),
+                    Text(
+                      "Hover Note",
+                      style: AppTextStyle.aristabold20.copyWith(
+                        color: Colors.white,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            ListTile(
+              leading: FaIcon(
+                FontAwesomeIcons.noteSticky,
+                color: Color.fromRGBO(255, 205, 7, 1),
+              ),
+              title: Text("All Notes", style: AppTextStyle.aristabold17),
+              onTap: () => Navigator.pop(context),
+            ),
+            ListTile(
+              leading: Icon(
+                Icons.settings_rounded,
+                color: Color.fromRGBO(255, 205, 7, 1),
+              ),
+              title: Text("Settings", style: AppTextStyle.aristabold17),
+              onTap: () {},
+            ),
+            ListTile(
+              leading: Icon(
+                Icons.info_rounded,
+                color: Color.fromRGBO(255, 205, 7, 1),
+              ),
+              title: Text("About", style: AppTextStyle.aristabold17),
+              onTap: () {},
+            ),
+          ],
+        ),
+      ),
       appBar: PreferredSize(
-        preferredSize: Size(80.w, 6.h),
+        preferredSize: Size(100.w, 8.h),
         child: SafeArea(
           child: Container(
-            padding: EdgeInsets.symmetric(horizontal: 3.w),
-            height: 7.h,
+            padding: EdgeInsets.symmetric(horizontal: 4.w, vertical: 1.h),
             color: Colors.white,
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Container(
-                  height: 4.5.h,
-                  padding: EdgeInsets.symmetric(horizontal: 3.w),
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(30),
-                    color: Color.fromRGBO(255, 205, 7, 1),
-                  ),
+                // Menu Icon + Title (or Search Field)
+                Expanded(
                   child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
-                      FaIcon(FontAwesomeIcons.bars, color: Colors.white),
-                      SizedBox(width: 4.w),
-                      Text(
-                        "Hover Note",
-                        style: AppTextStyle.aristabold20.copyWith(
-                          color: Colors.white,
+                      if (!_isSearching)
+                        GestureDetector(
+                          onTap: () => _scaffoldKey.currentState?.openDrawer(),
+                          child: Container(
+                            height: 5.h,
+                            padding: EdgeInsets.symmetric(horizontal: 3.w),
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(30),
+                              color: Color.fromRGBO(255, 205, 7, 1),
+                            ),
+                            child: Row(
+                              children: [
+                                FaIcon(
+                                  FontAwesomeIcons.bars,
+                                  color: Colors.white,
+                                  size: 2.h,
+                                ),
+                                SizedBox(width: 3.w),
+                                Text(
+                                  "Hover Note",
+                                  style: AppTextStyle.aristabold20.copyWith(
+                                    color: Colors.white,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
                         ),
-                      ),
+                      if (_isSearching)
+                        Expanded(
+                          child: Container(
+                            height: 5.h,
+                            padding: EdgeInsets.symmetric(horizontal: 4.w),
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(30),
+                              color: Colors.grey[100],
+                            ),
+                            child: TextField(
+                              controller: _searchController,
+                              autofocus: true,
+                              onChanged: (val) {
+                                setState(() {
+                                  _searchQuery = val;
+                                });
+                              },
+                              style: AppTextStyle.aristabold17,
+                              decoration: InputDecoration(
+                                hintText: "Search notes...",
+                                border: InputBorder.none,
+                                hintStyle: AppTextStyle.aristabold17.copyWith(
+                                  color: Colors.grey,
+                                ),
+                                icon: FaIcon(
+                                  FontAwesomeIcons.magnifyingGlass,
+                                  color: Color.fromRGBO(255, 205, 7, 1),
+                                  size: 2.h,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
                     ],
                   ),
                 ),
-                Container(
-                  padding: EdgeInsets.all(0),
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: Color.fromRGBO(20, 255, 20, 1),
-                  ),
-                  child: IconButton(
-                    onPressed: () {},
-                    icon: FaIcon(
-                      FontAwesomeIcons.magnifyingGlass,
-                      color: Colors.white,
-                      size: 2.5.h,
+                SizedBox(width: 3.w),
+                // Search Toggle Button
+                GestureDetector(
+                  onTap: () {
+                    setState(() {
+                      if (_isSearching) {
+                        _isSearching = false;
+                        _searchQuery = "";
+                        _searchController.clear();
+                      } else {
+                        _isSearching = true;
+                      }
+                    });
+                  },
+                  child: Container(
+                    height: 5.h,
+                    width: 5.h,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color:
+                          _isSearching
+                              ? Colors.redAccent
+                              : Color.fromRGBO(20, 255, 20, 1),
+                    ),
+                    child: Center(
+                      child: FaIcon(
+                        _isSearching
+                            ? FontAwesomeIcons.xmark
+                            : FontAwesomeIcons.magnifyingGlass,
+                        color: Colors.white,
+                        size: 2.h,
+                      ),
                     ),
                   ),
                 ),
@@ -235,18 +365,31 @@ class _HomepageState extends State<Homepage> {
                       SliverFillRemaining(
                         hasScrollBody: false,
                         child: Center(
-                          child: Image(
-                            width: 50.w,
-                            image: AssetImage("assets/images/emptynote.png"),
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Image(
+                                width: 50.w,
+                                image: AssetImage("assets/images/emptynote.png"),
+                              ),
+                              if (_isSearching && _searchQuery.isNotEmpty)
+                                Padding(
+                                  padding: EdgeInsets.only(top: 2.h),
+                                  child: Text(
+                                    "No matches found for '$_searchQuery'",
+                                    style: AppTextStyle.aristabold17.copyWith(color: Colors.grey),
+                                  ),
+                                ),
+                            ],
                           ),
                         ),
                       ),
                     ],
                   )
                   : ListView.builder(
-                    itemCount: currentNotes.length,
+                    itemCount: filteredNotes.length,
                     itemBuilder: (context, index) {
-                      final note = currentNotes[index];
+                      final note = filteredNotes[index];
                       return InkWell(
                         onTap: () {
                           openCreateEditPage(note: note);
