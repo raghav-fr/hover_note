@@ -1,5 +1,6 @@
 package com.example.hover_note
 
+import com.example.hover_note.R
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -18,6 +19,7 @@ import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
 import android.view.WindowManager
+import android.view.ViewTreeObserver
 import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.LinearLayout
@@ -169,8 +171,8 @@ class NativeOverlayService : Service() {
         // FLAG_NOT_FOCUSABLE: lets touch events pass through to apps underneath when not touching the overlay
         // WRAP_CONTENT: the window sizes itself to fit its content
         val params = WindowManager.LayoutParams(
-            dpToPx(280),                          // width in pixels (280dp)
-            WindowManager.LayoutParams.WRAP_CONTENT, // height wraps content
+            WindowManager.LayoutParams.WRAP_CONTENT, // was 280dp, now WRAP_CONTENT to allow for shadow padding
+            WindowManager.LayoutParams.WRAP_CONTENT,
             WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
             PixelFormat.TRANSLUCENT                // allows transparency/rounded corners
@@ -242,13 +244,25 @@ class NativeOverlayService : Service() {
         val context = this
 
         // ── Outer draggable container ──
-        val container = DraggableFrameLayout(context, windowManager, params)
+        val container = DraggableFrameLayout(context, windowManager, params).apply {
+            // Add padding to allow the shadow to draw without being clipped by the window edges
+            val padding = dpToPx(20)
+            setPadding(padding, padding, padding, padding)
+            clipChildren = false
+            clipToPadding = false
+        }
 
         // ── Card: HORIZONTAL layout (text left, buttons right) ──
         val card = LinearLayout(context).apply {
             orientation = LinearLayout.HORIZONTAL
             setPadding(dpToPx(12), dpToPx(12), dpToPx(12), dpToPx(12))
             gravity = Gravity.TOP
+            
+            // Set fixed width of 280dp so it stays consistent inside the padded container
+            val cardWidth = dpToPx(280)
+            layoutParams = FrameLayout.LayoutParams(cardWidth, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
+                gravity = Gravity.CENTER
+            }
 
             val bg = GradientDrawable().apply {
                 setColor(color)
@@ -262,7 +276,7 @@ class NativeOverlayService : Service() {
         val textView = TextView(context).apply {
             this.text = text
             setTextColor(Color.WHITE)
-            setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f)
             
             // Apply custom "Arista" font from assets
             try {
@@ -295,7 +309,7 @@ class NativeOverlayService : Service() {
         val closeIcon = TextView(context).apply {
             this.text = "✕"
             setTextColor(Color.WHITE)
-            setTextSize(TypedValue.COMPLEX_UNIT_SP, 16f)
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 15f)
             gravity = Gravity.CENTER
             val size = dpToPx(24)
             layoutParams = LinearLayout.LayoutParams(size, size)
@@ -311,7 +325,7 @@ class NativeOverlayService : Service() {
         val minimizeIcon = TextView(context).apply {
             this.text = "—"
             setTextColor(Color.WHITE)
-            setTextSize(TypedValue.COMPLEX_UNIT_SP, 16f)
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 15f)
             gravity = Gravity.CENTER
             val size = dpToPx(24)
             layoutParams = LinearLayout.LayoutParams(size, size)
@@ -322,8 +336,35 @@ class NativeOverlayService : Service() {
         buttonCol.addView(iconSpacer)
         buttonCol.addView(minimizeIcon)
 
+        // ── Dynamic Orientation based on Line Count ──
+        // If 1-2 lines → Horizontal icons. 3+ lines → Vertical icons.
+        textView.viewTreeObserver.addOnGlobalLayoutListener(object : ViewTreeObserver.OnGlobalLayoutListener {
+            override fun onGlobalLayout() {
+                textView.viewTreeObserver.removeOnGlobalLayoutListener(this)
+                val lines = textView.lineCount
+                if (lines > 0) {
+                    if (lines <= 2) {
+                        if(lines<=1){
+                            if(textView.text.length>32){
+                                textView.setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f)
+                            }else{
+                                textView.setTextSize(TypedValue.COMPLEX_UNIT_SP, 17f)
+                            }
+                        }
+                        buttonCol.orientation = LinearLayout.HORIZONTAL
+                        buttonCol.gravity = Gravity.CENTER_VERTICAL
+                        iconSpacer.layoutParams = LinearLayout.LayoutParams(dpToPx(6), 1)
+                    } else {
+                        buttonCol.orientation = LinearLayout.VERTICAL
+                        buttonCol.gravity = Gravity.TOP
+                        iconSpacer.layoutParams = LinearLayout.LayoutParams(1, dpToPx(6))
+                    }
+                }
+            }
+        })
+
         card.addView(textView)
-        //card.addView(spacer)
+        card.addView(spacer)
         card.addView(buttonCol)
 
         container.addView(card, FrameLayout.LayoutParams(
@@ -350,52 +391,59 @@ class NativeOverlayService : Service() {
         windowManager.removeView(currentView)
 
         if (!isMinimized) {
-            // → Minimize: create a 60x60 colored circle with a note icon inside
-            val bubbleSize = dpToPx(60)
+            // → Minimize: create a colored circle with a note icon inside
+            val bubbleSize = dpToPx(45)
+            val bubblePadding = dpToPx(12) // Extra padding for shadow
 
             val bubble = FrameLayout(this).apply {
                 tag = "minimized"
                 setTag(R.id.note_id_tag, id)
                 setTag(R.id.note_color_tag, color)
                 setTag(R.id.note_text_tag, text)
+                
+                clipChildren = false
+                clipToPadding = false
+                
+                // Tap to expand
+                setOnClickListener {
+                    Log.d(TAG, "Bubble tapped — expanding note id=$id")
+                    val savedText = it.getTag(R.id.note_text_tag) as? String ?: ""
+                    val savedColor = it.getTag(R.id.note_color_tag) as? Int ?: Color.BLACK
+                    val savedId = it.getTag(R.id.note_id_tag) as? Int ?: -1
+                    expandFromBubble(savedId, savedText, savedColor)
+                }
             }
 
-            // Colored circle background
+            // 1. The Circle View
             val circle = View(this).apply {
-                layoutParams = FrameLayout.LayoutParams(bubbleSize, bubbleSize)
-                val bg = GradientDrawable().apply {
+                layoutParams = FrameLayout.LayoutParams(bubbleSize, bubbleSize).apply {
+                    gravity = Gravity.CENTER
+                }
+                background = GradientDrawable().apply {
                     shape = GradientDrawable.OVAL
                     setColor(color)
                 }
-                background = bg
                 elevation = dpToPx(4).toFloat()
             }
 
-            // Sticky note icon centered in the bubble (📝 emoji as text)
-            val icon = TextView(this).apply {
-                this.text = "📝"
-                setTextSize(TypedValue.COMPLEX_UNIT_SP, 22f)
-                gravity = Gravity.CENTER
-                layoutParams = FrameLayout.LayoutParams(
-                    bubbleSize, bubbleSize
-                ).apply { gravity = Gravity.CENTER }
-            }
-
-            // Tap the bubble to expand back
-            bubble.setOnClickListener {
-                Log.d(TAG, "Bubble tapped — expanding note id=$id")
-                val savedText = it.getTag(R.id.note_text_tag) as? String ?: ""
-                val savedColor = it.getTag(R.id.note_color_tag) as? Int ?: Color.BLACK
-                val savedId = it.getTag(R.id.note_id_tag) as? Int ?: -1
-                expandFromBubble(savedId, savedText, savedColor)
+            // 2. The Custom Note Icon (SVG)
+            val icon = ImageView(this).apply {
+                setImageResource(R.drawable.ic_note)
+                // Icon size is 26dp (enough for the 45dp bubble)
+                val iconSize = dpToPx(24)
+                layoutParams = FrameLayout.LayoutParams(iconSize, iconSize).apply {
+                    gravity = Gravity.CENTER
+                }
+                // HIGHER elevation than the circle to ensure visibility
+                elevation = dpToPx(8).toFloat()
             }
 
             bubble.addView(circle)
             bubble.addView(icon)
 
             val bubbleParams = WindowManager.LayoutParams(
-                bubbleSize,
-                bubbleSize,
+                WindowManager.LayoutParams.WRAP_CONTENT,
+                WindowManager.LayoutParams.WRAP_CONTENT,
                 WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
                 WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
                 PixelFormat.TRANSLUCENT
@@ -403,10 +451,18 @@ class NativeOverlayService : Service() {
             bubbleParams.gravity = Gravity.TOP or Gravity.START
             bubbleParams.x = params.x
             bubbleParams.y = params.y
+            
+            // Add padding to bubble so the shadow isn't cut off inside the window
+            bubble.setPadding(bubblePadding, bubblePadding, bubblePadding, bubblePadding)
 
             attachDragListener(bubble, bubbleParams)
             windowManager.addView(bubble, bubbleParams)
             overlayViews[id] = bubble
+        } else {
+            // → Expand: rebuild the full note view
+            val expandedView = buildNoteView(id, text, color, params)
+            windowManager.addView(expandedView, params)
+            overlayViews[id] = expandedView
         }
     }
 
@@ -425,7 +481,7 @@ class NativeOverlayService : Service() {
         windowManager.removeView(currentView)
 
         val params = WindowManager.LayoutParams(
-            dpToPx(280),
+            WindowManager.LayoutParams.WRAP_CONTENT,
             WindowManager.LayoutParams.WRAP_CONTENT,
             WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
@@ -455,7 +511,7 @@ class NativeOverlayService : Service() {
         windowManager.removeView(currentView)
 
         val params = WindowManager.LayoutParams(
-            dpToPx(280),
+            WindowManager.LayoutParams.WRAP_CONTENT,
             WindowManager.LayoutParams.WRAP_CONTENT,
             WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
