@@ -69,6 +69,9 @@ class _HoverOverlayState extends State<HoverOverlay> {
       'id': id,
     });
     if (_notes.isEmpty) {
+      // Give the main engine time to receive the shareData message
+      // before killing the overlay process.
+      await Future.delayed(const Duration(milliseconds: 300));
       await FlutterOverlayWindow.closeOverlay();
     }
   }

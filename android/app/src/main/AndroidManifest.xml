@@ -53,10 +53,24 @@
             <property android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
                 android:value="explanation_for_special_use"/>
         </service>
+
+        <!-- Native Overlay Service for independent floating note windows -->
+        <service
+            android:name=".NativeOverlayService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="Displays floating note windows over other apps"/>
+        </service>
         <!-- Required by Flutter engine -->
         <meta-data
             android:name="flutterEmbedding"
             android:value="2" />
+
+        <!-- AdMob App ID -->
+        <meta-data
+            android:name="com.google.android.gms.ads.APPLICATION_ID"
+            android:value="ca-app-pub-6437781486320364~7975584827" />
 
     </application>
 

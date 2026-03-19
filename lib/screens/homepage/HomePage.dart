@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_overlay_window/flutter_overlay_window.dart';
+import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'package:hover_note/constants/AppTextStyle.dart';
 import 'package:hover_note/models/Notes.dart';
 import 'package:hover_note/models/note_database.dart';
@@ -18,72 +18,101 @@ class Homepage extends StatefulWidget {
   State<Homepage> createState() => _HomepageState();
 }
 
+// MethodChannel shared between overlay functions and the widget
+const MethodChannel _overlayChannel = MethodChannel('overlay_launcher');
+
 // Track which notes currently have an active overlay
 final Set<int> _activeOverlayIds = {};
 
+/// Shows a native floating overlay window for the given note.
+/// Each note gets its own independent, draggable window via NativeOverlayService.
 Future<void> showOverlay(Notes note) async {
-  // If this note is already shown, do nothing
-  if (_activeOverlayIds.contains(note.id)) return;
+  debugPrint("[OVERLAY] showOverlay called for note id=${note.id}");
+  
+  try {
+    // Check overlay permission via native code
+    final bool permitted = await _overlayChannel.invokeMethod('checkOverlayPermission');
+    debugPrint("[OVERLAY] Permission check result: $permitted");
 
-  bool permitted = await FlutterOverlayWindow.isPermissionGranted();
+    if (!permitted) {
+      debugPrint("[OVERLAY] Requesting overlay permission...");
+      await _overlayChannel.invokeMethod('requestOverlayPermission');
+      return; // User needs to grant permission in Settings, then try again
+    }
 
-  if (!permitted) {
-    permitted = (await FlutterOverlayWindow.requestPermission())!;
+    // If this note already has an active overlay, don't create a duplicate
+    if (_activeOverlayIds.contains(note.id)) {
+      debugPrint("[OVERLAY] Note ${note.id} already has active overlay, skipping");
+      return;
+    }
+
+    _activeOverlayIds.add(note.id);
+
+    debugPrint("[OVERLAY] Calling showNativeOverlay for id=${note.id}, text='${note.text}', color=${note.color}");
+    // Tell the native NativeOverlayService to create a new floating window
+    await _overlayChannel.invokeMethod('showNativeOverlay', {
+      'id': note.id,
+      'text': note.text,
+      'color': note.color,
+    });
+    debugPrint("[OVERLAY] showNativeOverlay call completed successfully");
+  } catch (e, stack) {
+    debugPrint("[OVERLAY] ERROR: $e");
+    debugPrint("[OVERLAY] Stack: $stack");
   }
-
-  if (!permitted) return;
-
-  // Check if the overlay window is actually active (not just our flag)
-  final bool isActive = await FlutterOverlayWindow.isActive();
-  print("Overlay is active: $isActive");
-  if (!isActive) {
-    // Reset tracking in case of stale state
-    _activeOverlayIds.clear();
-
-    await FlutterOverlayWindow.showOverlay(
-      width: 800,
-      height: 600,
-      enableDrag: true,
-      alignment: OverlayAlignment.center,
-      flag: OverlayFlag.defaultFlag,
-    );
-    await Future.delayed(const Duration(milliseconds: 400));
-  }
-
-  _activeOverlayIds.add(note.id);
-
-  // Send "add" command to the overlay engine
-  await FlutterOverlayWindow.shareData({
-    "command": "add",
-    "text": note.text,
-    "color": note.color,
-    "id": note.id,
-  });
 }
 
+/// Removes a specific note's native overlay window.
 void removeOverlay(int noteId) {
   _activeOverlayIds.remove(noteId);
-  FlutterOverlayWindow.shareData({
-    "command": "remove",
-    "id": noteId,
-  });
+  _overlayChannel.invokeMethod('closeNativeOverlay', {'id': noteId});
 }
 
+/// Called when the native service reports an overlay was closed (user tapped ✕).
 void onOverlayClosed(int noteId) {
   _activeOverlayIds.remove(noteId);
 }
 
 class _HomepageState extends State<Homepage> {
   static const MethodChannel _channel = MethodChannel('overlay_launcher');
-  @override
-void initState() {
-  super.initState();
-  context.read<NoteDatabase>().fetchNotes();
 
-  WidgetsBinding.instance.addPostFrameCallback((_) {
-    _checkLaunchIntent();
-  });
-}
+  // --- AdMob Banner ---
+  static const String _adUnitId = 'ca-app-pub-6437781486320364/6277958371';
+  BannerAd? _bannerAd;
+  bool _isBannerAdLoaded = false;
+
+  void _loadBannerAd() {
+    _bannerAd = BannerAd(
+      adUnitId: _adUnitId,
+      size: AdSize.banner,
+      request: const AdRequest(),
+      listener: BannerAdListener(
+        onAdLoaded: (_) {
+          if (mounted) setState(() => _isBannerAdLoaded = true);
+        },
+        onAdFailedToLoad: (ad, error) {
+          ad.dispose();
+        },
+      ),
+    )..load();
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    context.read<NoteDatabase>().fetchNotes();
+    _loadBannerAd();
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _checkLaunchIntent();
+    });
+  }
+
+  @override
+  void dispose() {
+    _bannerAd?.dispose();
+    super.dispose();
+  }
 
   Future<void> _checkLaunchIntent() async {
     try {
@@ -233,6 +262,13 @@ void initState() {
                   ),
         ),
       ),
+      bottomNavigationBar: _isBannerAdLoaded && _bannerAd != null
+          ? SizedBox(
+              height: _bannerAd!.size.height.toDouble(),
+              width: double.infinity,
+              child: AdWidget(ad: _bannerAd!),
+            )
+          : const SizedBox.shrink(),
     );
   }
 }

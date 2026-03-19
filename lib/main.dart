@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart'; // Required for MethodChannel
-import 'package:flutter_overlay_window/flutter_overlay_window.dart'; // Required for listener
+import 'package:flutter/services.dart';
+import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'package:hover_note/models/note_database.dart';
-import 'package:hover_note/overlay/hoverOverlay.dart';
 import 'package:hover_note/screens/homepage/HomePage.dart';
 import 'package:hover_note/services/notification_service/notification_service.dart';
 import 'package:provider/provider.dart';
@@ -11,20 +10,9 @@ import 'package:sizer/sizer.dart';
 // Global key to allow navigation from anywhere in the app
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
-@pragma('vm:entry-point')
-void overlayMain() {
-  WidgetsFlutterBinding.ensureInitialized();
-  runApp(const HoverOverlay());
-}
-
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  // Close any stale overlay from previous session (safe — won't crash if none exists)
-  try {
-    if (await FlutterOverlayWindow.isActive()) {
-      await FlutterOverlayWindow.closeOverlay();
-    }
-  } catch (_) {}
+  await MobileAds.instance.initialize();
   await NotificationService.initialize();
   await NoteDatabase.initialize();
 
@@ -44,25 +32,52 @@ class MyApp extends StatefulWidget {
 }
 
 class _MyAppState extends State<MyApp> {
-  // The channel name must match your Kotlin file
+  // The channel must match the one in OverlayPlugin.kt
   static const MethodChannel _channel = MethodChannel('overlay_launcher');
 
   @override
   void initState() {
     super.initState();
 
-    // --- THE GLOBAL BRIDGE LISTENER ---
-    // This catches the message from the Overlay Engine
-    FlutterOverlayWindow.overlayListener.listen((data) {
-      if (data is Map) {
-        if (data['command'] == 'open_edit_page') {
-          // Since we are in the Main Engine, the MethodChannel is registered!
-          // This triggers the Kotlin code to bring the app to the front.
-          _channel.invokeMethod('openEditPage', {'id': data['id']});
-        } else if (data['command'] == 'overlay_closed') {
-          // Keep the main app's active overlay tracking in sync
-          onOverlayClosed(data['id']);
-        }
+    // --- NATIVE OVERLAY CALLBACK HANDLER ---
+    // Listen for events sent FROM the native NativeOverlayService TO Flutter.
+    // These are triggered when the user interacts with a native overlay window.
+    _channel.setMethodCallHandler((call) async {
+      switch (call.method) {
+
+        // User tapped the ✕ close button on a native overlay
+        case 'onOverlayClosed':
+          final id = call.arguments['id'] as int;
+          onOverlayClosed(id);  // Updates _activeOverlayIds in HomePage.dart
+          break;
+
+        // User tapped the ✎ edit button on a native overlay
+        case 'openEditPage':
+          final id = call.arguments['id'] as int;
+          // Use OverlayPlugin's native openEditPage to bring app to front
+          _channel.invokeMethod('openEditPage', {'id': id});
+          break;
+
+        // Native service is expanding a minimized bubble and needs the note's text/color
+        case 'requestNoteData':
+          final id = call.arguments['id'] as int;
+          // Look up the note from the database
+          final db = navigatorKey.currentContext
+              ?.read<NoteDatabase>();
+          if (db != null) {
+            try {
+              final note = db.currentNotes.firstWhere((n) => n.id == id);
+              // Send the data back to native so it can rebuild the expanded view
+              _channel.invokeMethod('expandOverlay', {
+                'id': note.id,
+                'text': note.text,
+                'color': note.color,
+              });
+            } catch (_) {
+              // Note not found — ignore
+            }
+          }
+          break;
       }
     });
   }
@@ -81,4 +96,4 @@ class _MyAppState extends State<MyApp> {
       },
     );
   }
-}
+}

@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Custom View tag IDs used by NativeOverlayService to store note data on minimized bubbles -->
+    <item name="note_id_tag" type="id" />
+    <item name="note_color_tag" type="id" />
+    <item name="note_text_tag" type="id" />
+</resources>
