@@ -1,5 +1,7 @@
 import 'package:awesome_notifications/awesome_notifications.dart';
-import 'package:timezone/timezone.dart' as tz;
+import 'package:hover_note/main.dart';
+import 'package:hover_note/models/note_database.dart';
+import 'package:provider/provider.dart';
 import 'package:timezone/data/latest_all.dart' as tzData;
 
 class NotificationService {
@@ -7,7 +9,7 @@ class NotificationService {
     // ✅ Initialize timezone
     tzData.initializeTimeZones();
 
-    await AwesomeNotifications().initialize('resource://drawable/notification_icon', [
+    await AwesomeNotifications().initialize('resource://drawable/ic_note_sticky', [
       NotificationChannel(
         channelKey: 'basic_channel',
         channelName: 'Basic Notifications',
@@ -16,13 +18,61 @@ class NotificationService {
       ),
     ], debug: true);
 
-    // ✅ Ask for permission
-    await AwesomeNotifications().isNotificationAllowed().then((isAllowed) {
-      if (!isAllowed) {
-        AwesomeNotifications().requestPermissionToSendNotifications();
-      }
-    });
+    // ✅ Ask for permissions including Precise Alarms
+    bool isAllowed = await AwesomeNotifications().isNotificationAllowed();
+    if (!isAllowed) {
+      await AwesomeNotifications().requestPermissionToSendNotifications(
+        permissions: [
+          NotificationPermission.Alert,
+          NotificationPermission.Sound,
+          NotificationPermission.Badge,
+          NotificationPermission.Vibration,
+          NotificationPermission.Light,
+        ],
+      );
+    }
 
+    // Explicitly ask for precise alarms permission (needed on Android 12+ for exact scheduling)
+    List<NotificationPermission> preciseAlarmPerm = await AwesomeNotifications().checkPermissionList(
+      channelKey: 'basic_channel',
+      permissions: [NotificationPermission.PreciseAlarms],
+    );
+
+    if (!preciseAlarmPerm.contains(NotificationPermission.PreciseAlarms)) {
+      await AwesomeNotifications().requestPermissionToSendNotifications(
+        permissions: [NotificationPermission.PreciseAlarms],
+      );
+    }
+
+    // ✅ Background execution requires listeners to be set to be reliable
+    await AwesomeNotifications().setListeners(
+      onActionReceivedMethod: onActionReceivedMethod,
+      onNotificationCreatedMethod: onNotificationCreatedMethod,
+      onNotificationDisplayedMethod: onNotificationDisplayedMethod,
+      onDismissActionReceivedMethod: onDismissActionReceivedMethod,
+    );
+  }
+
+  @pragma("vm:entry-point")
+  static Future<void> onNotificationCreatedMethod(ReceivedNotification receivedNotification) async {}
+
+  @pragma("vm:entry-point")
+  static Future<void> onNotificationDisplayedMethod(ReceivedNotification receivedNotification) async {}
+
+  @pragma("vm:entry-point")
+  static Future<void> onDismissActionReceivedMethod(ReceivedAction receivedAction) async {}
+
+  @pragma("vm:entry-point")
+  static Future<void> onActionReceivedMethod(ReceivedAction receivedAction) async {
+    // When a notification is clicked, refresh the database if we can
+    try {
+      final context = navigatorKey.currentContext;
+      if (context != null) {
+        context.read<NoteDatabase>().fetchNotes();
+      }
+    } catch (e) {
+      // Handle potential errors if context is not available
+    }
   }
 
   static Future<void> showNotification({
@@ -36,6 +86,9 @@ class NotificationService {
         title: title,
         body: body,
         notificationLayout: NotificationLayout.Default,
+        wakeUpScreen: true,
+        category: NotificationCategory.Reminder,
+        largeIcon: 'resource://drawable/notification_icon',
       ),
     );
   }
@@ -46,11 +99,6 @@ class NotificationService {
     required String body,
     required DateTime scheduledTime,
   }) async {
-    final tz.TZDateTime tzScheduledDate = tz.TZDateTime.from(
-      scheduledTime,
-      tz.local,
-    );
-
     await AwesomeNotifications().createNotification(
       content: NotificationContent(
         id: DateTime.now().millisecondsSinceEpoch.remainder(100000),
@@ -58,9 +106,14 @@ class NotificationService {
         title: title,
         body: body,
         notificationLayout: NotificationLayout.Default,
+        wakeUpScreen: true,
+        category: NotificationCategory.Reminder,
+        largeIcon: 'resource://drawable/notification_icon',
       ),
       schedule: NotificationCalendar.fromDate(
-        date: tzScheduledDate,
+        date: scheduledTime.toLocal(),
+        allowWhileIdle: true,
+        preciseAlarm: true,
       ),
     );
   }

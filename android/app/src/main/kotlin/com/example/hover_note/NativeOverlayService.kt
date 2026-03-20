@@ -130,14 +130,14 @@ class NativeOverlayService : Service() {
             Notification.Builder(this, CHANNEL_ID)
                 .setContentTitle("Hover Note")
                 .setContentText("Notes are floating")
-                .setSmallIcon(android.R.drawable.ic_dialog_info)
+                .setSmallIcon(R.drawable.ic_note_sticky)
                 .build()
         } else {
             @Suppress("DEPRECATION")
             Notification.Builder(this)
                 .setContentTitle("Hover Note")
                 .setContentText("Notes are floating")
-                .setSmallIcon(android.R.drawable.ic_dialog_info)
+                .setSmallIcon(R.drawable.ic_note_sticky)
                 .build()
         }
 

@@ -4,7 +4,6 @@ import 'package:hover_note/services/notification_service/notification_service.da
 import 'package:isar/isar.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:workmanager/workmanager.dart';
-import 'package:timezone/timezone.dart' as tz;
 import 'package:timezone/data/latest.dart' as tzdata;
 
 const String saveNoteTask = "saveNoteTask";
@@ -33,6 +32,10 @@ void callbackDispatcher() {
 class NoteDatabase extends ChangeNotifier {
   static late Isar isar;
 
+  NoteDatabase() {
+    startWatching();
+  }
+
   //initialization
   static Future<void> initialize() async {
     final dir = await getApplicationDocumentsDirectory();
@@ -46,6 +49,13 @@ class NoteDatabase extends ChangeNotifier {
 
     // Auto-cleanup trash after 20 days
     await _cleanupOldTrash(isar);
+  }
+
+  // Watch for changes in Isar to make DB reactive
+  void startWatching() {
+    isar.notes.watchLazy().listen((_) {
+      fetchNotes();
+    });
   }
 
   static Future<void> _cleanupOldTrash(Isar isarInstance) async {
@@ -240,14 +250,11 @@ class NoteDatabase extends ChangeNotifier {
       inputData: {'id': id},
     );
 
-    // Schedule notification using AwesomeNotifications + Timezone
-    final tz.TZDateTime scheduledDate =
-        tz.TZDateTime.from(reminderTime, tz.local);
-
+    // Schedule notification using AwesomeNotifications
     await NotificationService.scheduleNotification(
       title: "Hover note notifies u",
       body: text,
-      scheduledTime: scheduledDate
+      scheduledTime: reminderTime,
     );
   }
 }

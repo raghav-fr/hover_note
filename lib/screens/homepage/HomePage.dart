@@ -57,7 +57,7 @@ void onOverlayClosed(int noteId) {
   _activeOverlayIds.remove(noteId);
 }
 
-class _HomepageState extends State<Homepage> {
+class _HomepageState extends State<Homepage> with WidgetsBindingObserver {
   static const MethodChannel _channel = MethodChannel('overlay_launcher');
 
   // --- AdMob Banner ---
@@ -94,6 +94,7 @@ class _HomepageState extends State<Homepage> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     context.read<NoteDatabase>().fetchNotes();
     _loadBannerAd();
 
@@ -104,9 +105,18 @@ class _HomepageState extends State<Homepage> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _bannerAd?.dispose();
     _searchController.dispose();
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      // Refresh notes when app comes back to foreground
+      context.read<NoteDatabase>().fetchNotes();
+    }
   }
 
   Future<void> _checkLaunchIntent() async {
@@ -452,7 +462,9 @@ class _HomepageState extends State<Homepage> {
               onPressed: () async {
                 Navigator.pop(context);
                 final db = context.read<NoteDatabase>();
-                for (final id in _selectedNoteIds) await db.deleteNote(id);
+                for (final id in _selectedNoteIds) {
+                  await db.deleteNote(id);
+                }
                 setState(() { _isSelectionMode = false; _selectedNoteIds.clear(); });
               },
               child: Text("Delete", style: AppTextStyle.aristabold17.copyWith(color: Colors.redAccent)),

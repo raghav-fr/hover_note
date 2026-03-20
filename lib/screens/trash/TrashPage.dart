@@ -282,8 +282,9 @@ class _TrashPageState extends State<TrashPage> {
                                 ),
                                 onPressed: () async {
                                   final db = context.read<NoteDatabase>();
-                                  for (final id in _selectedNoteIds)
+                                  for (final id in _selectedNoteIds) {
                                     await db.restoreNote(id);
+                                  }
                                   setState(() {
                                     _isSelectionMode = false;
                                     _selectedNoteIds.clear();
@@ -486,8 +487,9 @@ class _TrashPageState extends State<TrashPage> {
                                     setState(() {
                                       if (_selectedNoteIds.contains(note.id)) {
                                         _selectedNoteIds.remove(note.id);
-                                        if (_selectedNoteIds.isEmpty)
+                                        if (_selectedNoteIds.isEmpty) {
                                           _isSelectionMode = false;
+                                        }
                                       } else {
                                         _selectedNoteIds.add(note.id);
                                       }
