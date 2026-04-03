@@ -182,7 +182,7 @@ class _HomepageState extends State<Homepage> with WidgetsBindingObserver {
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Image.asset("assets/images/drawerlogo.png", height: 8.h),
+                          Image.asset("assets/images/logowhite.png", height: 8.h),
                           SizedBox(height: 1.h),
                           Text("Hover Note", style: AppTextStyle.aristabold20.copyWith(color: Colors.white)),
                           SizedBox(height: 2.h),
@@ -370,11 +370,7 @@ class _HomepageState extends State<Homepage> with WidgetsBindingObserver {
                               mainAxisSize: MainAxisSize.min,
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
-                                Image(width: 50.w, image: const AssetImage("assets/images/drawerlogo.png")),
-                                Padding(
-                                  padding: EdgeInsets.only(top: 2.h),
-                                  child: Text("No notes yet!", textAlign: TextAlign.center, style: AppTextStyle.aristabold17.copyWith(color: Colors.grey)),
-                                ),
+                                Image(width: 50.w, image: const AssetImage("assets/images/emptynote.png")),
                                 if (_isSearching && _searchQuery.isNotEmpty)
                                   Padding(
                                     padding: EdgeInsets.only(top: 2.h),

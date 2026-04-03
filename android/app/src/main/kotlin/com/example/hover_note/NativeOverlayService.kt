@@ -130,14 +130,14 @@ class NativeOverlayService : Service() {
             Notification.Builder(this, CHANNEL_ID)
                 .setContentTitle("Hover Note")
                 .setContentText("Notes are floating")
-                .setSmallIcon(R.drawable.ic_note_sticky)
+                .setSmallIcon(R.drawable.ic_small_noti)
                 .build()
         } else {
             @Suppress("DEPRECATION")
             Notification.Builder(this)
                 .setContentTitle("Hover Note")
                 .setContentText("Notes are floating")
-                .setSmallIcon(R.drawable.ic_note_sticky)
+                .setSmallIcon(R.drawable.ic_small_noti)
                 .build()
         }
 
@@ -428,7 +428,7 @@ class NativeOverlayService : Service() {
 
             // 2. The Custom Note Icon (SVG)
             val icon = ImageView(this).apply {
-                setImageResource(R.drawable.ic_note)
+                setImageResource(R.drawable.ic_small_noti)
                 // Icon size is 26dp (enough for the 45dp bubble)
                 val iconSize = dpToPx(24)
                 layoutParams = FrameLayout.LayoutParams(iconSize, iconSize).apply {

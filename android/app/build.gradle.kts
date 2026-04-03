@@ -1,3 +1,9 @@
+import java.util.Properties
+import java.io.FileInputStream
+
+val keystoreProperties = Properties().apply {
+    load(FileInputStream(rootProject.file("key.properties")))
+}
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
@@ -7,7 +13,7 @@ plugins {
 
 android {
     namespace = "com.example.hover_note"
-    compileSdk = 35
+    compileSdk = 36
     ndkVersion = "27.0.12077973"
 
     compileOptions {
@@ -25,30 +31,38 @@ android {
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
         minSdk = flutter.minSdkVersion
-        targetSdk = 35
+        targetSdk = 36
         versionCode = flutter.versionCode
         versionName = flutter.versionName
+        ndk {
+        abiFilters += listOf("armeabi-v7a", "arm64-v8a")
+    }
     }
 
-        bundle {
-        language {
-            enableSplit = false
-        }
+    signingConfigs {
+    create("release") {
+        keyAlias = keystoreProperties["keyAlias"] as String
+        keyPassword = keystoreProperties["keyPassword"] as String
+        storeFile = file(keystoreProperties["storeFile"] as String)
+        storePassword = keystoreProperties["storePassword"] as String
     }
+}
 
     buildTypes {
         getByName("release") {
-    signingConfig = signingConfigs.getByName("debug")
-    isMinifyEnabled = true
-    isShrinkResources = true
+            signingConfig = signingConfigs.getByName("release")
+            isMinifyEnabled = true
+            isShrinkResources = true
 
-    proguardFiles(
-getDefaultProguardFile("proguard-android.txt"),
-        file("proguard-rules.pro")
-    )
-}
+            proguardFiles(
+                getDefaultProguardFile("proguard-android.txt"),
+                file("proguard-rules.pro")
+            )
+        }
     }
 }
+
+
 
 flutter {
     source = "../.."

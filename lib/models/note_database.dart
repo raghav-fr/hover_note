@@ -4,7 +4,6 @@ import 'package:hover_note/services/notification_service/notification_service.da
 import 'package:isar/isar.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:workmanager/workmanager.dart';
-import 'package:timezone/data/latest.dart' as tzdata;
 
 const String saveNoteTask = "saveNoteTask";
 
@@ -44,8 +43,6 @@ class NoteDatabase extends ChangeNotifier {
     // ✅ Init Workmanager for background DB saving
     Workmanager().initialize(callbackDispatcher, isInDebugMode: false);
 
-    // ✅ Init Timezone for scheduling notifications
-    tzdata.initializeTimeZones();
 
     // Auto-cleanup trash after 20 days
     await _cleanupOldTrash(isar);

@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:hover_note/constants/AppTextStyle.dart';
-import 'package:hover_note/models/notes.dart';
 import 'package:hover_note/models/note_database.dart';
 import 'package:hover_note/screens/homepage/HomePage.dart';
 import 'package:hover_note/screens/settings/SettingsPage.dart';
@@ -122,7 +121,7 @@ class _ScheduledPageState extends State<ScheduledPage> {
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           Image.asset(
-                            "assets/images/drawerlogo.png",
+                            "assets/images/logowhite.png",
                             height: 8.h,
                           ),
                           SizedBox(height: 1.h),
@@ -452,14 +451,11 @@ class _ScheduledPageState extends State<ScheduledPage> {
                                 child: Column(
                                   children: [
                                     Image.asset(
-                                      "assets/images/drawerlogo.png",
+                                      "assets/images/logogreen.png",
                                       width: 40.w,
                                     ),
                                     SizedBox(height: 2.h),
-                                    Text(
-                                      "No scheduled notes",
-                                      style: AppTextStyle.aristabold17,
-                                    ),
+                                    Text("No Scheduled Notes",style: AppTextStyle.aristabold17.copyWith(color: Color.fromRGBO(0, 255, 149, 1)),)
                                   ],
                                 ),
                               ),

@@ -22,7 +22,7 @@
     <application
         android:label="Hover Note"
         android:name="${applicationName}"
-        android:icon="@mipmap/launcher_icon">
+        android:icon="@mipmap/ic_launcher">
 
         <!-- Main Activity -->
         <activity
@@ -46,9 +46,8 @@
             </intent-filter>
         </activity>
 
-        <!-- Awesome Notifications -->
-        <!-- REQUIRED: Awesome Notifications receivers -->
-<service android:name="flutter.overlay.window.flutter_overlay_window.OverlayService" 
+        <!-- Flutter Overlay Window Service -->
+        <service android:name="flutter.overlay.window.flutter_overlay_window.OverlayService" 
             android:exported="false"
             android:foregroundServiceType="specialUse">
             <property android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
@@ -63,16 +62,27 @@
             <property android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
                 android:value="Displays floating note windows over other apps"/>
         </service>
+
         <!-- Required by Flutter engine -->
         <meta-data
             android:name="flutterEmbedding"
             android:value="2" />
 
+        <!-- Native notification receivers -->
+        <receiver android:exported="false" android:name=".NotificationReceiver" />
+        <receiver android:exported="false" android:name=".BootReceiver">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED"/>
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED"/>
+                <action android:name="android.intent.action.QUICKBOOT_POWERON" />
+                <action android:name="com.htc.intent.action.QUICKBOOT_POWERON"/>
+            </intent-filter>
+        </receiver>
+
         <!-- AdMob App ID -->
         <meta-data
             android:name="com.google.android.gms.ads.APPLICATION_ID"
             android:value="ca-app-pub-6437781486320364~7975584827" />
-
     </application>
 
 </manifest>
